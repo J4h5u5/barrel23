@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from pathlib import Path
 from .config import settings
 from .database import engine
@@ -27,6 +28,10 @@ def on_startup():
 app.include_router(auth.router)
 app.include_router(content.router)
 app.include_router(media.router)
+
+@app.get("/admin")
+def admin_redirect():
+    return RedirectResponse(url="/admin.html")
 
 # Uploads volume (nginx also serves this directly for performance)
 uploads_path = Path(settings.uploads_dir)
