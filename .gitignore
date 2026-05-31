@@ -10,7 +10,10 @@ backend/.env
 
 # Uploads and media (go on server, not in repo)
 uploads/
-frontend/assets/
+frontend/assets/*
+!frontend/assets/logo.png
+!frontend/assets/logo-raw.png
+!frontend/assets/wordmark.png
 front_design/assets/
 front_design/screenshots/
 front_design/uploads/
