@@ -2,8 +2,8 @@
 DEFAULT_CONTENT = {
     "brand": {
         "name": "BARREL 23",
-        "logo": "/uploads/images/logo.png",
-        "wordmark": "/uploads/images/wordmark.png"
+        "logo": "/assets/logo.png",
+        "wordmark": "/assets/wordmark.png"
     },
     "nav": {
         "enabled": False,
