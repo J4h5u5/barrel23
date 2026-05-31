@@ -8,8 +8,13 @@ __pycache__/
 .env
 backend/.env
 
-# Uploads (user-generated content, not in repo)
+# Uploads and media (go on server, not in repo)
 uploads/
+frontend/assets/
+front_design/assets/
+front_design/screenshots/
+front_design/uploads/
+*.zip
 
 # DB / local state
 *.db
@@ -21,3 +26,4 @@ uploads/
 # Editor
 .idea/
 .vscode/
+.claude/
