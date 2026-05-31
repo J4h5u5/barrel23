@@ -5,6 +5,7 @@
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var el = function (tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+  var esc = function (t) { return (t == null ? '' : String(t)).replace(/[&<>]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]; }); };
 
   var TOKEN_KEY = 'barrel23_admin_token';
   var C = null;
@@ -324,10 +325,107 @@
     root.appendChild(vcard);
   };
 
+  function openArchiveModal(a) {
+    var overlay = el('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
+    var box = el('div');
+    box.style.cssText = 'background:#111;border:1px solid #333;padding:32px;max-width:520px;width:100%;max-height:90vh;overflow-y:auto;font-family:var(--mono)';
+
+    var selectedPhoto = a.images && a.images.length ? a.images[0] : '';
+
+    box.innerHTML = '<div style="color:var(--red);font-size:11px;letter-spacing:3px;margin-bottom:20px">ARCHIVE EVENT</div>' +
+      '<h2 style="margin:0 0 6px;font-size:22px">' + esc(a.eventName) + '</h2>' +
+      '<div style="color:#888;font-size:12px;margin-bottom:24px">' + esc(a.date) + ' — ' + esc(a.city) + '</div>';
+
+    /* lineup preview */
+    var lu = (a.lineup || []).map(function (act) { return typeof act === 'string' ? act : act.name; }).filter(Boolean);
+    if (lu.length) {
+      var luEl = el('div'); luEl.style.cssText = 'margin-bottom:24px;font-size:12px;color:#aaa';
+      luEl.innerHTML = '<div style="color:#666;letter-spacing:2px;font-size:10px;margin-bottom:8px">LINE-UP</div>' + lu.join(', ');
+      box.appendChild(luEl);
+    }
+
+    /* photo picker */
+    var photoSection = el('div'); photoSection.style.marginBottom = '24px';
+    photoSection.innerHTML = '<div style="color:#666;letter-spacing:2px;font-size:10px;margin-bottom:10px">ARCHIVE PHOTO</div>';
+
+    var photoPreview = el('div');
+    photoPreview.style.cssText = 'width:100%;aspect-ratio:16/9;background:#0a0a0a center/cover no-repeat;border:1px solid #333;margin-bottom:10px';
+    if (selectedPhoto) photoPreview.style.backgroundImage = 'url(' + selectedPhoto + ')';
+
+    /* carousel thumbnails */
+    var thumbs = el('div'); thumbs.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px';
+    (a.images || []).forEach(function (src) {
+      var t = el('div');
+      t.style.cssText = 'width:72px;height:48px;background:#0a0a0a center/cover no-repeat;border:2px solid ' + (src === selectedPhoto ? 'var(--red)' : '#333') + ';cursor:pointer;flex-shrink:0';
+      t.style.backgroundImage = 'url(' + src + ')';
+      t.addEventListener('click', function () {
+        selectedPhoto = src;
+        photoPreview.style.backgroundImage = 'url(' + src + ')';
+        Array.from(thumbs.children).forEach(function (c) { c.style.borderColor = '#333'; });
+        t.style.borderColor = 'var(--red)';
+        urlInput.value = '';
+      });
+      thumbs.appendChild(t);
+    });
+
+    /* manual URL input */
+    var urlWrap = el('div');
+    var urlInput = el('input'); urlInput.type = 'text'; urlInput.placeholder = 'Or paste image URL…';
+    urlInput.style.cssText = 'width:100%;box-sizing:border-box;background:#0a0a0a;border:1px solid #333;color:#fff;padding:8px 10px;font-family:inherit;font-size:12px;outline:none';
+    urlInput.addEventListener('input', function () {
+      if (urlInput.value) { selectedPhoto = urlInput.value; photoPreview.style.backgroundImage = 'url(' + urlInput.value + ')'; }
+    });
+    urlWrap.appendChild(urlInput);
+
+    photoSection.appendChild(photoPreview);
+    if ((a.images || []).length) photoSection.appendChild(thumbs);
+    photoSection.appendChild(urlWrap);
+    box.appendChild(photoSection);
+
+    /* buttons */
+    var btnRow = el('div'); btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;margin-top:8px';
+    var cancelBtn = el('button', 'btn btn--sm', 'CANCEL');
+    var confirmBtn = el('button', 'btn btn--sm', 'ARCHIVE & RESET TO TBA');
+    confirmBtn.style.background = 'var(--red)';
+    cancelBtn.addEventListener('click', function () { document.body.removeChild(overlay); });
+    confirmBtn.addEventListener('click', function () {
+      var entry = {
+        name: a.eventName,
+        date: a.date,
+        city: a.city,
+        image: selectedPhoto,
+        lineup: (a.lineup || []).map(function (act) { return typeof act === 'string' ? act : act.name; }).filter(Boolean)
+      };
+      C.pastEvents.unshift(entry);
+      /* reset next event to TBA */
+      a.announced = false;
+      a.eventName = ''; a.date = ''; a.doors = ''; a.city = ''; a.venue = ''; a.blurb = '';
+      a.lineup = []; a.images = [];
+      document.body.removeChild(overlay);
+      setDirty(true);
+      setTimeout(function () { route('announce'); }, 0);
+    });
+    btnRow.appendChild(cancelBtn); btnRow.appendChild(confirmBtn);
+    box.appendChild(btnRow);
+    overlay.appendChild(box);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) document.body.removeChild(overlay); });
+    document.body.appendChild(overlay);
+  }
+
   panels.announce = function (root) {
     var a = C.announce;
     if (typeof a.announced === 'undefined') a.announced = true;
     a.tba = a.tba || { headline: 'TBA', status: 'TO BE ANNOUNCED', blurb: '', ctaLabel: 'GET THE DROP', ctaUrl: '#' };
+
+    /* archive action card */
+    var archCard = el('div', 'card');
+    archCard.innerHTML = '<div class="kick">ARCHIVE</div><div class="card__head"><div><h2>Archive current event</h2><p>Saves the current event to the top of Past Events and resets Next Event to TBA state.</p></div></div>';
+    var archBtn = el('button', 'btn', '⬇ MOVE TO ARCHIVE');
+    archBtn.style.marginTop = '16px';
+    archBtn.addEventListener('click', function () { openArchiveModal(a); });
+    archCard.appendChild(archBtn);
+    root.appendChild(archCard);
 
     /* status toggle card */
     var statusCard = el('div', 'card');
