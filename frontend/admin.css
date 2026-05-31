@@ -152,6 +152,18 @@ img{ display:block; max-width:100%; }
   padding:13px 22px; border-radius:6px; opacity:0; transition:.3s; font-weight:700; }
 .toast.show{ transform:translate(-50%,0); opacity:1; }
 
+/* ---- Media Library ---- */
+.media-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
+.media-item{ background:var(--panel-2); border:1px solid var(--line); border-radius:6px; overflow:hidden;
+  display:flex; flex-direction:column; }
+.media-thumb{ width:100%; aspect-ratio:16/10; background:#0a0a0a center/cover no-repeat; flex-shrink:0; }
+.media-info{ padding:10px 12px; display:flex; flex-direction:column; gap:6px; flex:1; }
+.media-name{ font-family:var(--mono); font-size:10px; color:var(--ink-dim); white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+.media-size{ font-family:var(--mono); font-size:11px; color:var(--ink-mute); }
+.media-actions{ display:flex; gap:4px; flex-wrap:wrap; margin-top:4px; }
+.media-actions select{ flex:1; min-width:80px; }
+
 @media (max-width:880px){
   .layout{ grid-template-columns:1fr; }
   .side{ position:static; height:auto; flex-direction:row; flex-wrap:wrap; }

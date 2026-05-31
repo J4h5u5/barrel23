@@ -90,14 +90,15 @@
     });
   }
 
-  function uploadFile(file, onProgress) {
+  function uploadFile(file, preset) {
+    preset = preset || 'gallery';
     var fd = new FormData();
     fd.append('file', file);
+    fd.append('preset', preset);
     return new Promise(function (resolve, reject) {
       var xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/media/upload');
       xhr.setRequestHeader('Authorization', 'Bearer ' + getToken());
-      if (onProgress) xhr.upload.onprogress = function (e) { if (e.lengthComputable) onProgress(e.loaded / e.total); };
       xhr.onload = function () {
         if (xhr.status === 200) resolve(JSON.parse(xhr.responseText));
         else reject(new Error('Upload failed: ' + xhr.status));
@@ -105,6 +106,33 @@
       xhr.onerror = function () { reject(new Error('Upload error')); };
       xhr.send(fd);
     });
+  }
+
+  function resizeFile(fileId, preset) {
+    var fd = new FormData();
+    fd.append('file_id', fileId);
+    fd.append('preset', preset);
+    return new Promise(function (resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/media/resize');
+      xhr.setRequestHeader('Authorization', 'Bearer ' + getToken());
+      xhr.onload = function () {
+        if (xhr.status === 200) resolve(JSON.parse(xhr.responseText));
+        else reject(new Error('Resize failed: ' + xhr.status));
+      };
+      xhr.onerror = function () { reject(new Error('Resize error')); };
+      xhr.send(fd);
+    });
+  }
+
+  function deleteFile(fileId) {
+    return apiFetch('/api/media/files/' + fileId, { method: 'DELETE' });
+  }
+
+  function fmtSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(2) + ' MB';
   }
 
   /* ============================================================
@@ -144,37 +172,60 @@
     return f;
   }
 
-  /* Image/file field with real upload support */
-  function mediaField(labelText, value, accept, onChange) {
+  /* Image/file field with preset-aware upload */
+  function mediaField(labelText, value, accept, onChange, preset) {
+    preset = preset || 'gallery';
+    var isImage = !accept || accept.indexOf('image') !== -1;
     var f = el('div', 'field');
     f.appendChild(el('label', null, labelText));
     var wrap = el('div', 'imgpick');
     var prev = el('div', 'imgpick__prev');
     if (value) prev.style.backgroundImage = 'url(' + value + ')';
     var col = el('div', 'imgpick__col');
-    var urlInput = el('input'); urlInput.type = 'text'; urlInput.value = value || ''; urlInput.style.fontFamily = 'var(--mono)'; urlInput.style.fontSize = '13px';
+
+    var urlInput = el('input'); urlInput.type = 'text'; urlInput.value = value || '';
+    urlInput.style.fontFamily = 'var(--mono)'; urlInput.style.fontSize = '13px';
     urlInput.addEventListener('input', function () {
       prev.style.backgroundImage = urlInput.value ? 'url(' + urlInput.value + ')' : 'none';
       onChange(urlInput.value); setDirty(true);
     });
-    var uploadBtn = el('button', 'btn btn--sm'); uploadBtn.style.marginTop = '8px';
-    uploadBtn.textContent = 'UPLOAD FILE';
+
+    var row = el('div'); row.style.cssText = 'display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap';
+
+    var uploadBtn = el('button', 'btn btn--sm'); uploadBtn.textContent = 'UPLOAD';
     var fileInput = el('input'); fileInput.type = 'file'; fileInput.accept = accept || 'image/*'; fileInput.hidden = true;
+
+    // Preset selector (only for images)
+    var presetSel = null;
+    if (isImage) {
+      presetSel = el('select'); presetSel.style.cssText = 'background:#111;color:#888;border:1px solid #333;padding:4px 8px;font-family:var(--mono);font-size:11px;cursor:pointer';
+      [['gallery','GALLERY (1400px)'],['portrait','PORTRAIT (800px)'],['thumbnail','THUMB (600px)'],['original','ORIGINAL']].forEach(function(p){
+        var o = el('option'); o.value = p[0]; o.textContent = p[1];
+        if (p[0] === preset) o.selected = true;
+        presetSel.appendChild(o);
+      });
+      row.appendChild(presetSel);
+    }
+
     uploadBtn.addEventListener('click', function () { fileInput.click(); });
     fileInput.addEventListener('change', function () {
       var file = fileInput.files[0]; if (!file) return;
-      uploadBtn.textContent = 'UPLOADING…'; uploadBtn.disabled = true;
-      uploadFile(file)
+      var selectedPreset = presetSel ? presetSel.value : 'original';
+      uploadBtn.textContent = '…'; uploadBtn.disabled = true;
+      uploadFile(file, selectedPreset)
         .then(function (data) {
           urlInput.value = data.url;
           prev.style.backgroundImage = 'url(' + data.url + ')';
           onChange(data.url); setDirty(true);
-          uploadBtn.textContent = 'UPLOAD FILE'; uploadBtn.disabled = false;
-          toast('UPLOADED: ' + data.original_name);
+          uploadBtn.textContent = 'UPLOAD'; uploadBtn.disabled = false;
+          var saved = data.saved_bytes > 0 ? ' (saved ' + fmtSize(data.saved_bytes) + ')' : '';
+          toast('UPLOADED ' + fmtSize(data.size_bytes) + saved);
         })
-        .catch(function (e) { toast('UPLOAD FAILED: ' + e.message); uploadBtn.textContent = 'UPLOAD FILE'; uploadBtn.disabled = false; });
+        .catch(function (e) { toast('UPLOAD FAILED: ' + e.message); uploadBtn.textContent = 'UPLOAD'; uploadBtn.disabled = false; });
     });
-    col.appendChild(urlInput); col.appendChild(uploadBtn); col.appendChild(fileInput);
+
+    row.appendChild(uploadBtn); row.appendChild(fileInput);
+    col.appendChild(urlInput); col.appendChild(row);
     wrap.appendChild(prev); wrap.appendChild(col);
     f.appendChild(wrap);
     return f;
@@ -507,6 +558,141 @@
   };
 
   /* ============================================================
+     MEDIA LIBRARY PANEL
+     ============================================================ */
+  panels.media = function (root) {
+    var card = el('div', 'card');
+    card.innerHTML = '<div class="kick">UPLOADS</div><div class="card__head"><div><h2>Media Library</h2><p>All uploaded files. Click an image to copy its URL. Use the resize tool to re-optimize existing images.</p></div></div>';
+
+    // Filter tabs
+    var tabs = el('div'); tabs.style.cssText = 'display:flex;gap:8px;margin-bottom:20px';
+    var activeFilter = 'image';
+    var grid = el('div', 'media-grid');
+
+    function loadMedia() {
+      grid.innerHTML = '<div style="color:#555;font-family:var(--mono);font-size:12px">Loading…</div>';
+      apiFetch('/api/media/files?category=' + activeFilter)
+        .then(function (r) { return r.json(); })
+        .then(function (files) {
+          grid.innerHTML = '';
+          if (!files.length) {
+            grid.innerHTML = '<div style="color:#555;font-family:var(--mono);font-size:12px;padding:20px 0">No files uploaded yet.</div>';
+            return;
+          }
+          files.forEach(function (f) {
+            var item = el('div', 'media-item');
+            var thumb = el('div', 'media-thumb');
+            if (f.category === 'image') {
+              thumb.style.backgroundImage = 'url(' + f.url + ')';
+            } else if (f.category === 'audio') {
+              thumb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px;color:#ff2417"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>';
+              thumb.style.cssText += 'display:flex;align-items:center;justify-content:center;background:#111';
+            } else {
+              thumb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px;color:#ff2417"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+              thumb.style.cssText += 'display:flex;align-items:center;justify-content:center;background:#111';
+            }
+
+            var info = el('div', 'media-info');
+            var name = el('div', 'media-name'); name.textContent = f.original_name; name.title = f.original_name;
+            var size = el('div', 'media-size'); size.textContent = fmtSize(f.size_bytes);
+
+            var actions = el('div', 'media-actions');
+
+            // Copy URL
+            var copyBtn = el('button', 'btn btn--sm', 'COPY URL');
+            copyBtn.addEventListener('click', function () {
+              navigator.clipboard.writeText(f.url).then(function () { toast('URL COPIED'); });
+            });
+            actions.appendChild(copyBtn);
+
+            // Resize (images only)
+            if (f.category === 'image') {
+              var resSel = el('select'); resSel.style.cssText = 'background:#111;color:#888;border:1px solid #333;padding:4px 6px;font-family:var(--mono);font-size:10px;cursor:pointer';
+              [['gallery','1400px'],['portrait','800px'],['thumbnail','600px']].forEach(function(p){
+                var o = el('option'); o.value = p[0]; o.textContent = p[1]; resSel.appendChild(o);
+              });
+              var resBtn = el('button', 'btn btn--sm', 'RESIZE →');
+              resBtn.addEventListener('click', function () {
+                resBtn.textContent = '…'; resBtn.disabled = true;
+                resizeFile(f.id, resSel.value)
+                  .then(function (data) {
+                    var saved = data.saved_bytes > 0 ? ' saved ' + fmtSize(data.saved_bytes) : '';
+                    toast('RESIZED → ' + fmtSize(data.size_bytes) + (saved ? ' (' + saved + ')' : ''));
+                    size.textContent = fmtSize(data.size_bytes);
+                    if (f.category === 'image') thumb.style.backgroundImage = 'url(' + data.url + '?' + Date.now() + ')';
+                    f.url = data.url; f.filename = data.filename; f.size_bytes = data.size_bytes;
+                    resBtn.textContent = 'RESIZE →'; resBtn.disabled = false;
+                  })
+                  .catch(function (e) { toast('RESIZE FAILED: ' + e.message); resBtn.textContent = 'RESIZE →'; resBtn.disabled = false; });
+              });
+              actions.appendChild(resSel);
+              actions.appendChild(resBtn);
+            }
+
+            // Delete
+            var delBtn = el('button', 'btn btn--sm btn--danger', '✕');
+            delBtn.addEventListener('click', function () {
+              if (!confirm('Delete ' + f.original_name + '?')) return;
+              deleteFile(f.id).then(function () { item.remove(); toast('DELETED'); });
+            });
+            actions.appendChild(delBtn);
+
+            info.appendChild(name); info.appendChild(size); info.appendChild(actions);
+            item.appendChild(thumb); item.appendChild(info);
+            grid.appendChild(item);
+          });
+        })
+        .catch(function () { grid.innerHTML = '<div style="color:#ff2417;font-family:var(--mono);font-size:12px">Failed to load files.</div>'; });
+    }
+
+    ['image', 'audio', 'video'].forEach(function (cat) {
+      var btn = el('button', 'btn btn--sm' + (cat === activeFilter ? ' btn--primary' : ''));
+      btn.textContent = cat.toUpperCase();
+      btn.addEventListener('click', function () {
+        activeFilter = cat;
+        $$('button', tabs).forEach(function (b) { b.classList.remove('btn--primary'); });
+        btn.classList.add('btn--primary');
+        loadMedia();
+      });
+      tabs.appendChild(btn);
+    });
+
+    // Quick upload
+    var uploadCard = el('div', 'card'); uploadCard.style.marginBottom = '20px';
+    uploadCard.innerHTML = '<div class="card__head"><div><h2>Quick Upload</h2></div></div>';
+    var upRow = el('div'); upRow.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+    var upPreset = el('select'); upPreset.style.cssText = 'background:#111;color:#888;border:1px solid #333;padding:6px 10px;font-family:var(--mono);font-size:11px;cursor:pointer';
+    [['gallery','GALLERY (1400px max)'],['portrait','PORTRAIT (800px max)'],['thumbnail','THUMB (600px max)'],['original','ORIGINAL (no resize)']].forEach(function(p){
+      var o = el('option'); o.value = p[0]; o.textContent = p[1]; upPreset.appendChild(o);
+    });
+    var upFile = el('input'); upFile.type = 'file'; upFile.accept = 'image/*,audio/*,video/*'; upFile.hidden = true;
+    var upBtn = el('button', 'btn btn--primary', 'CHOOSE FILE');
+    upBtn.addEventListener('click', function () { upFile.click(); });
+    upFile.addEventListener('change', function () {
+      var file = upFile.files[0]; if (!file) return;
+      upBtn.textContent = 'UPLOADING…'; upBtn.disabled = true;
+      uploadFile(file, upPreset.value)
+        .then(function (data) {
+          var saved = data.saved_bytes > 0 ? ' (saved ' + fmtSize(data.saved_bytes) + ')' : '';
+          toast('UPLOADED ' + fmtSize(data.size_bytes) + saved);
+          upBtn.textContent = 'CHOOSE FILE'; upBtn.disabled = false;
+          activeFilter = data.category;
+          $$('button', tabs).forEach(function (b, i) { b.classList.toggle('btn--primary', ['image','audio','video'][i] === data.category); });
+          loadMedia();
+        })
+        .catch(function (e) { toast('FAILED: ' + e.message); upBtn.textContent = 'CHOOSE FILE'; upBtn.disabled = false; });
+    });
+    upRow.appendChild(upPreset); upRow.appendChild(upBtn); upRow.appendChild(upFile);
+    uploadCard.appendChild(upRow);
+
+    root.appendChild(uploadCard);
+    card.appendChild(tabs);
+    card.appendChild(grid);
+    root.appendChild(card);
+    loadMedia();
+  };
+
+  /* ============================================================
      ROUTER
      ============================================================ */
   var current = 'dashboard';
@@ -514,7 +700,8 @@
     dashboard: ['Dashboard', 'OVERVIEW'], hero: ['Hero & Countdown', 'BLOCK 01'],
     announce: ['Next Event', 'BLOCK 02'], events: ['Past Events', 'BLOCK 03'],
     djs: ['Residents', 'BLOCK 03'], sets: ['Audio Sets', 'PLAYER'],
-    about: ['About', 'BLOCK 04'], settings: ['Contacts & Settings', 'FOOTER']
+    about: ['About', 'BLOCK 04'], settings: ['Contacts & Settings', 'FOOTER'],
+    media: ['Media Library', 'UPLOADS']
   };
 
   function route(name) {
