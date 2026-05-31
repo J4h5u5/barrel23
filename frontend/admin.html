@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BARREL 23 — Admin</title>
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<div class="layout">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="side">
+    <a class="side__brand" href="index.html" target="_blank">
+      <img src="assets/logo.png" alt="BARREL 23">
+      <div><b>BARREL 23</b><small>CONTENT ADMIN</small></div>
+    </a>
+    <nav class="side__nav">
+      <div class="side__group">GENERAL</div>
+      <a class="navlink active" data-go="dashboard" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</a>
+
+      <div class="side__group">PAGE BLOCKS</div>
+      <a class="navlink" data-go="hero" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Hero & Countdown</a>
+      <a class="navlink" data-go="announce" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>Next Event</a>
+      <a class="navlink" data-go="events" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Past Events</a>
+      <a class="navlink" data-go="djs" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Residents</a>
+      <a class="navlink" data-go="sets" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>Audio Sets</a>
+      <a class="navlink" data-go="about" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 10h16M4 15h11M4 20h7"/></svg>About</a>
+
+      <div class="side__group">SITE</div>
+      <a class="navlink" data-go="settings" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>Contacts & Settings</a>
+    </nav>
+    <div class="side__foot">
+      <input type="file" id="imp-file" accept="application/json" hidden>
+      <button class="btn btn--ghost btn--sm" onclick="document.getElementById('imp-file').click()">IMPORT JSON</button>
+      <button class="btn btn--ghost btn--sm" id="btn-export">EXPORT JSON</button>
+      <button class="btn btn--ghost btn--sm" id="btn-reset">RESET DEFAULTS</button>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <div class="crumb" id="page-crumb">BARREL 23 / OVERVIEW</div>
+        <h1 id="page-title">Dashboard</h1>
+      </div>
+      <div class="topbar__actions">
+        <span class="savestate saved" id="savestate">✓ ALL SAVED</span>
+        <a class="btn btn--ghost" href="index.html" target="_blank">VIEW SITE ↗</a>
+        <button class="btn btn--primary" id="btn-save">SAVE CHANGES</button>
+      </div>
+    </header>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="admin.js"></script>
+</body>
+</html>

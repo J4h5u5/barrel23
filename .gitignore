@@ -1,0 +1,23 @@
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Env files (contain secrets)
+.env
+backend/.env
+
+# Uploads (user-generated content, not in repo)
+uploads/
+
+# DB / local state
+*.db
+*.sqlite
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/

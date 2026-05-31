@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BARREL 23 — Hard Techno · Underground · UAE</title>
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<div class="grain"></div>
+
+<!-- ================= TOP BAR (nav hidden for now) ================= -->
+<header class="topbar" id="topbar">
+  <a class="topbar__brand" href="#top">
+    <img data-logo alt="BARREL 23">
+    <img class="topbar__wordmark" data-wordmark alt="BARREL 23">
+  </a>
+  <nav class="nav nav--hidden" id="nav"><!-- ARCHIVE / MERCH / LINEUP / TICKETS / INFO --></nav>
+</header>
+
+<!-- ================= 1 · HERO ================= -->
+<section class="hero" id="top" data-screen-label="Hero">
+  <video class="hero__video" id="hero-video" autoplay muted loop playsinline data-parallax="0.15"></video>
+  <div class="hero__scrim"></div>
+
+  <div class="hero__inner">
+    <img class="hero__logo" data-logo alt="BARREL 23">
+    <div class="kicker center" id="hero-tagline">HARD TECHNO · SCHRANZ · UNDERGROUND</div>
+    <h1 class="display hero__title" id="hero-title"><em>COVEN</em></h1>
+    <div class="hero__meta">
+      <span id="hero-edition">VOL. 03</span>
+      <span id="hero-location"><b>DUBAI — UAE</b></span>
+      <span>20 JUNE 2026</span>
+    </div>
+
+    <div class="countdown" aria-label="Countdown to next event">
+      <div class="cd-unit" id="cd-days"><span class="bolt"></span><span class="cd-num">00</span><span class="cd-label">DAYS</span></div>
+      <div class="cd-sep">:</div>
+      <div class="cd-unit" id="cd-hours"><span class="bolt"></span><span class="cd-num">00</span><span class="cd-label">HOURS</span></div>
+      <div class="cd-sep">:</div>
+      <div class="cd-unit" id="cd-minutes"><span class="bolt"></span><span class="cd-num">00</span><span class="cd-label">MINUTES</span></div>
+      <div class="cd-sep">:</div>
+      <div class="cd-unit" id="cd-seconds"><span class="bolt"></span><span class="cd-num">00</span><span class="cd-label">SECONDS</span></div>
+    </div>
+  </div>
+
+  <a class="scrollcue" href="#next"><span>SCROLL</span><span class="line"></span></a>
+</section>
+
+<!-- ================= 2 · NEXT EVENT ================= -->
+<section class="section announce" id="next" data-screen-label="Next event">
+  <div class="wrap announce__grid">
+    <div class="announce__copy reveal">
+      <div class="kicker" id="an-kicker">NEXT TRANSMISSION</div>
+      <h2 class="display" id="an-title"><em>COVEN</em></h2>
+      <div class="announce__facts" id="an-facts"></div>
+      <div class="lineup-next" id="an-lineup-wrap">
+        <div class="kicker" id="an-lineup-label">LINE-UP</div>
+        <ol class="lineup-next__list" id="an-lineup"></ol>
+      </div>
+      <p class="announce__blurb" id="an-blurb"></p>
+      <a class="btn" id="an-ticket" href="#tickets">GET TICKETS </a>
+    </div>
+    <div class="carousel reveal" data-parallax="-0.04">
+      <div class="carousel__track" id="carousel-track"></div>
+      <div class="carousel__tag">LAST EDITION — DUBAI</div>
+      <div class="carousel__dots" id="carousel-dots"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 3 · ARCHIVE (past events + DJs) ================= -->
+<section class="section" id="archive" data-screen-label="Archive">
+  <div class="wrap">
+    <div class="head-row reveal">
+      <div>
+        <div class="kicker">PAST TRANSMISSIONS</div>
+        <h2 class="display">ARCHIVE</h2>
+      </div>
+      <div class="count" id="ev-count">[ 00 ARCHIVED ]</div>
+    </div>
+    <div class="events" id="events"></div>
+
+    <div class="head-row reveal" style="margin-top:clamp(60px,8vw,110px)">
+      <div>
+        <div class="kicker">THE CIRCLE</div>
+        <h2 class="display">RESIDENTS</h2>
+      </div>
+    </div>
+    <div class="djs" id="djs"></div>
+  </div>
+</section>
+
+<!-- ================= 4 · ABOUT ================= -->
+<section class="section about" id="info" data-screen-label="About">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="kicker" id="ab-kicker">WHO WE ARE</div>
+      <h2 class="display about__statement" id="ab-statement"></h2>
+    </div>
+    <div class="about__cols">
+      <div class="reveal">
+        <div id="ab-paras"></div>
+        <div class="styles" id="ab-styles"></div>
+        <div class="contact-row">
+          <div><span class="k">GENERAL</span><a id="contact-email" href="#">info@barrel23.rave</a></div>
+          <div><span class="k">BOOKINGS</span><a id="contact-bookings" href="#">bookings@barrel23.rave</a></div>
+        </div>
+      </div>
+      <aside class="sound reveal" data-parallax="-0.03">
+        <div class="kicker">THE SYSTEM</div>
+        <div class="f1 display">FUNCTION-ONE</div>
+        <h3 class="display" id="sound-head">THE SOUND</h3>
+        <p id="sound-body"></p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer class="footer" data-screen-label="Footer">
+  <div class="wrap">
+    <div class="footer__top">
+      <div class="footer__brand">
+        <img data-logo alt="BARREL 23">
+        <img class="footer__wordmark" data-wordmark alt="BARREL 23">
+        <p>HARD TECHNO COLLECTIVE — UAE</p>
+      </div>
+      <div class="socials" id="footer-socials"></div>
+    </div>
+    <nav class="footer__nav" id="footer-nav"></nav>
+    <div class="footer__legal">
+      <span>© <span id="footer-year">2026</span> BARREL 23. ALL RIGHTS RESERVED.</span>
+      <span>BUILT FOR THE FLOOR.</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ================= REDUCE-MOTION TOGGLE ================= -->
+<button class="rm-toggle" id="rm-toggle">MOTION <b>ON</b></button>
+
+<!-- ================= MEDIA PLAYER ================= -->
+<div class="tracklist" id="tracklist"></div>
+<div class="player" id="player">
+  <button class="player__nav" id="pl-prev" aria-label="Previous"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h2v14H7zM20 5v14l-9-7z"/></svg></button>
+  <button class="player__btn" id="pl-play" aria-label="Play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg></button>
+  <button class="player__nav" id="pl-next" aria-label="Next"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 5h2v14h-2zM4 5l9 7-9 7z"/></svg></button>
+  <div class="player__eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div class="player__meta">
+    <div class="player__title" id="pl-title">—</div>
+    <div class="player__sub" id="pl-sub">—</div>
+  </div>
+  <div class="player__bar">
+    <span class="player__time start" id="pl-cur">0:00</span>
+    <div class="seek" id="seek"><div class="seek__fill" id="seek-fill"></div><div class="seek__head" id="seek-head"></div></div>
+    <span class="player__time end" id="pl-end">0:00</span>
+  </div>
+  <button class="player__list-btn" id="pl-list">SETS</button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
