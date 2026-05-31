@@ -398,7 +398,7 @@ button{ font-family: inherit; cursor: pointer; }
 
 /* ============================================================ TBA / SIGNAL
    Shown when the next event date is unknown (Hero + Announce). */
-.signal{ display:flex; flex-direction:column; align-items:center; gap:16px; }
+.signal{ display:flex; flex-direction:column; align-items:center; gap:16px; position:relative; z-index:2; }
 .signal--left{ align-items:flex-start; }
 .signal__label{ font-family:var(--mono); font-size:13px; letter-spacing:.42em;
   text-transform:uppercase; color:var(--red); }
