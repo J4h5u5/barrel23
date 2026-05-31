@@ -27,6 +27,7 @@
 }
 
 *{ box-sizing: border-box; }
+[hidden]{ display: none !important; }
 html{ scroll-behavior: smooth; }
 body{
   margin:0; background: var(--black); color: var(--ink);
@@ -394,3 +395,28 @@ button{ font-family: inherit; cursor: pointer; }
   .hero__meta{ font-size:11px; gap:8px 16px; }
   .rm-toggle{ bottom: 84px; }
 }
+
+/* ============================================================ TBA / SIGNAL
+   Shown when the next event date is unknown (Hero + Announce). */
+.signal{ display:flex; flex-direction:column; align-items:center; gap:16px; }
+.signal--left{ align-items:flex-start; }
+.signal__label{ font-family:var(--mono); font-size:13px; letter-spacing:.42em;
+  text-transform:uppercase; color:var(--red); }
+.signal__bar{ position:relative; width:clamp(220px,40vw,440px); height:2px;
+  background:var(--line); overflow:hidden; }
+.signal--left .signal__bar{ width:clamp(200px,28vw,340px); }
+.signal__sweep{ position:absolute; top:0; left:0; height:100%; width:36%;
+  background:linear-gradient(90deg, transparent, var(--red) 35%, #fff 50%, var(--red) 65%, transparent);
+  filter:drop-shadow(0 0 10px var(--red-glow));
+  animation: sweep 2.6s cubic-bezier(.7,0,.3,1) infinite; }
+@keyframes sweep{ 0%{ transform:translateX(-110%); } 60%{ transform:translateX(320%); } 100%{ transform:translateX(320%); } }
+.signal__status{ display:inline-flex; align-items:center; gap:.85em;
+  font-family:var(--mono); font-size:12px; letter-spacing:.3em; text-transform:uppercase; color:var(--ink-dim); }
+.signal__status::before{ content:""; width:7px; height:7px; border-radius:50%;
+  background:var(--red); box-shadow:0 0 10px var(--red); animation: sigpulse 1.6s ease-in-out infinite; }
+@keyframes sigpulse{ 0%,100%{ opacity:.3; transform:scale(.8); } 50%{ opacity:1; transform:scale(1.15); } }
+.reduce-motion .signal__sweep{ animation:none; left:0; width:100%; opacity:.4; }
+.reduce-motion .signal__status::before{ animation:none; }
+
+.announce-tba{ margin-top: 30px; max-width: 56ch; }
+.announce-tba .signal{ margin: 6px 0 26px; }

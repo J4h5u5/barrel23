@@ -31,10 +31,10 @@
     <div class="hero__meta">
       <span id="hero-edition">VOL. 03</span>
       <span id="hero-location"><b>DUBAI — UAE</b></span>
-      <span>20 JUNE 2026</span>
+      <span id="hero-date">20 JUNE 2026</span>
     </div>
 
-    <div class="countdown" aria-label="Countdown to next event">
+    <div class="countdown" id="countdown" aria-label="Countdown to next event">
       <div class="cd-unit" id="cd-days"><span class="bolt"></span><span class="cd-num">00</span><span class="cd-label">DAYS</span></div>
       <div class="cd-sep">:</div>
       <div class="cd-unit" id="cd-hours"><span class="bolt"></span><span class="cd-num">00</span><span class="cd-label">HOURS</span></div>
@@ -45,6 +45,12 @@
     </div>
   </div>
 
+    <div class="signal" id="hero-signal" hidden>
+      <span class="signal__label" id="hero-signal-label">NEXT TRANSMISSION</span>
+      <div class="signal__bar"><span class="signal__sweep"></span></div>
+      <span class="signal__status" id="hero-signal-status">DATE TO BE REVEALED</span>
+    </div>
+
   <a class="scrollcue" href="#next"><span>SCROLL</span><span class="line"></span></a>
 </section>
 
@@ -54,13 +60,24 @@
     <div class="announce__copy reveal">
       <div class="kicker" id="an-kicker">NEXT TRANSMISSION</div>
       <h2 class="display" id="an-title"><em>COVEN</em></h2>
-      <div class="announce__facts" id="an-facts"></div>
-      <div class="lineup-next" id="an-lineup-wrap">
-        <div class="kicker" id="an-lineup-label">LINE-UP</div>
-        <ol class="lineup-next__list" id="an-lineup"></ol>
+      <div class="announce__live" id="an-live">
+        <div class="announce__facts" id="an-facts"></div>
+        <div class="lineup-next" id="an-lineup-wrap">
+          <div class="kicker" id="an-lineup-label">LINE-UP</div>
+          <ol class="lineup-next__list" id="an-lineup"></ol>
+        </div>
+        <p class="announce__blurb" id="an-blurb"></p>
+        <a class="btn" id="an-ticket" href="#tickets">GET TICKETS </a>
       </div>
-      <p class="announce__blurb" id="an-blurb"></p>
-      <a class="btn" id="an-ticket" href="#tickets">GET TICKETS </a>
+
+      <div class="announce-tba" id="an-tba" hidden>
+        <div class="signal signal--left">
+          <div class="signal__bar"><span class="signal__sweep"></span></div>
+          <span class="signal__status" id="an-tba-status">TO BE ANNOUNCED</span>
+        </div>
+        <p class="announce__blurb" id="an-tba-blurb"></p>
+        <a class="btn" id="an-tba-cta" href="#">GET THE DROP </a>
+      </div>
     </div>
     <div class="carousel reveal" data-parallax="-0.04">
       <div class="carousel__track" id="carousel-track"></div>

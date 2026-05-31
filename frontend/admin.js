@@ -326,6 +326,20 @@
 
   panels.announce = function (root) {
     var a = C.announce;
+    if (typeof a.announced === 'undefined') a.announced = true;
+    a.tba = a.tba || { headline: 'TBA', status: 'TO BE ANNOUNCED', blurb: '', ctaLabel: 'GET THE DROP', ctaUrl: '#' };
+
+    /* status toggle card */
+    var statusCard = el('div', 'card');
+    statusCard.innerHTML = '<div class="kick">BLOCK 01 + 02</div><div class="card__head"><div><h2>Next event status</h2><p>When the date isn\'t locked yet, switch to <b>Date TBA</b> — the countdown and event details are hidden and replaced with a "to be announced" state.</p></div></div>';
+    var segWrap = el('div'); segWrap.style.cssText = 'display:flex;gap:8px;margin:16px 0 0';
+    var segOn = el('button', 'btn btn--sm', 'ANNOUNCED');
+    var segOff = el('button', 'btn btn--sm', '◌ DATE TBA');
+    segWrap.appendChild(segOn); segWrap.appendChild(segOff);
+    statusCard.appendChild(segWrap);
+    root.appendChild(statusCard);
+
+    /* live event card */
     var card = el('div', 'card');
     card.innerHTML = '<div class="kick">BLOCK 02</div><div class="card__head"><div><h2>Next Event Announcement</h2></div></div>';
     var g = el('div', 'grid cols-2');
@@ -390,6 +404,32 @@
     addImg.addEventListener('click', function () { a.images.push(''); renderImgs(); setDirty(true); });
     icard.appendChild(imgList); icard.appendChild(addImg);
     root.appendChild(icard);
+
+    /* TBA editor card */
+    var tcard = el('div', 'card');
+    tcard.innerHTML = '<div class="kick">DATE TBA</div><div class="card__head"><div><h2>"To be announced" state</h2><p>Copy shown in Block 02 while no date is set. Block 01 shows the signal line.</p></div></div>';
+    var th = field('Headline', a.tba.headline); bind(th._input, a.tba, 'headline'); tcard.appendChild(th);
+    var ts = field('Status line', a.tba.status); bind(ts._input, a.tba, 'status'); tcard.appendChild(ts);
+    var tb = field('Blurb', a.tba.blurb, { textarea: true, rows: 3 }); bind(tb._input, a.tba, 'blurb'); tcard.appendChild(tb);
+    var g2 = el('div', 'grid cols-2');
+    var tc1 = field('CTA label', a.tba.ctaLabel); bind(tc1._input, a.tba, 'ctaLabel');
+    var tc2 = field('CTA URL', a.tba.ctaUrl, { mono: true }); bind(tc2._input, a.tba, 'ctaUrl');
+    g2.appendChild(tc1); g2.appendChild(tc2); tcard.appendChild(g2);
+    var th2 = field('Hero signal text (Block 01)', C.hero.tbaStatus || 'DATE TO BE REVEALED');
+    bind(th2._input, C.hero, 'tbaStatus'); th2.style.marginTop = '18px'; tcard.appendChild(th2);
+    root.appendChild(tcard);
+
+    var liveCards = [card, lcard, icard];
+    function applyState() {
+      segOn.classList.toggle('on', !!a.announced);
+      segOff.classList.toggle('on', !a.announced);
+      liveCards.forEach(function (c) { c.style.opacity = a.announced ? '' : '0.4'; c.style.pointerEvents = a.announced ? '' : 'none'; });
+      tcard.style.opacity = a.announced ? '0.4' : '';
+      tcard.style.pointerEvents = a.announced ? 'none' : '';
+    }
+    segOn.addEventListener('click', function () { a.announced = true; setDirty(true); applyState(); });
+    segOff.addEventListener('click', function () { a.announced = false; setDirty(true); applyState(); });
+    applyState();
   };
 
   panels.events = function (root) {

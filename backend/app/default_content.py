@@ -15,9 +15,11 @@ DEFAULT_CONTENT = {
         "tagline": "HARD TECHNO · SCHRANZ · UNDERGROUND",
         "location": "DUBAI — UAE",
         "targetDate": "2026-06-20T22:00:00",
+        "tbaStatus": "DATE TO BE REVEALED",
         "video": "/uploads/video/bg.mp4"
     },
     "announce": {
+        "announced": True,
         "kicker": "NEXT TRANSMISSION",
         "eventName": "COVEN",
         "date": "20 JUNE 2026",
@@ -35,7 +37,14 @@ DEFAULT_CONTENT = {
         ],
         "ticketLabel": "GET TICKETS",
         "ticketUrl": "#",
-        "images": []
+        "images": [],
+        "tba": {
+            "headline": "TBA",
+            "status": "TO BE ANNOUNCED",
+            "blurb": "",
+            "ctaLabel": "GET THE DROP",
+            "ctaUrl": "#"
+        }
     },
     "pastEvents": [],
     "djs": [],

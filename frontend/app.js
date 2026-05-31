@@ -23,6 +23,7 @@
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
   function init(C) {
+    var announced = !(C.announce && C.announce.announced === false);
     /* ===== BRAND / NAV ===== */
     $$('[data-brand-name]').forEach(function (el) { el.textContent = C.brand.name; });
     $$('[data-logo]').forEach(function (el) { el.src = C.brand.logo; });
@@ -49,6 +50,24 @@
       vid.addEventListener('loadeddata', tryPlay);
       tryPlay();
       document.addEventListener('click', tryPlay, { once: true });
+    }
+
+    /* ===== HERO DATE / COUNTDOWN vs TBA ===== */
+    var heroDate = $('#hero-date');
+    var cdEl = $('#countdown'), sigEl = $('#hero-signal');
+    if (announced) {
+      if (heroDate) { heroDate.textContent = C.announce.date || heroDate.textContent; heroDate.hidden = false; }
+      if (sigEl) sigEl.hidden = true;
+      if (cdEl) cdEl.hidden = false;
+    } else {
+      if (heroDate) heroDate.hidden = true;
+      if (cdEl) cdEl.hidden = true;
+      if (sigEl) {
+        sigEl.hidden = false;
+        var sl = $('#hero-signal-label'), ss = $('#hero-signal-status');
+        if (sl) sl.textContent = C.announce.kicker || 'NEXT TRANSMISSION';
+        if (ss) ss.textContent = C.hero.tbaStatus || 'DATE TO BE REVEALED';
+      }
     }
 
     /* ===== COUNTDOWN ===== */
@@ -79,15 +98,29 @@
 
     /* ===== ANNOUNCE ===== */
     var a = C.announce;
+    var anLive = $('#an-live'), anTba = $('#an-tba');
     $('#an-kicker').textContent = a.kicker;
-    $('#an-title').innerHTML = '<em>' + esc(a.eventName) + '</em>';
-    $('#an-blurb').textContent = a.blurb;
-    var btn = $('#an-ticket');
-    btn.childNodes[0].nodeValue = a.ticketLabel + " ";
-    btn.href = a.ticketUrl;
-    $('#an-facts').innerHTML = [['DATE', a.date], ['DOORS', a.doors], ['CITY', a.city], ['VENUE', a.venue]].map(function (f) {
-      return '<div class="fact"><div class="k">' + esc(f[0]) + '</div><div class="v">' + esc(f[1]) + '</div></div>';
-    }).join("");
+    $('#an-title').innerHTML = '<em>' + esc(announced ? a.eventName : (a.tba && a.tba.headline ? a.tba.headline : 'TBA')) + '</em>';
+
+    if (announced) {
+      if (anLive) anLive.hidden = false;
+      if (anTba) anTba.hidden = true;
+      $('#an-blurb').textContent = a.blurb;
+      var btn = $('#an-ticket');
+      btn.childNodes[0].nodeValue = a.ticketLabel + " ";
+      btn.href = a.ticketUrl;
+      $('#an-facts').innerHTML = [['DATE', a.date], ['DOORS', a.doors], ['CITY', a.city], ['VENUE', a.venue]].map(function (f) {
+        return '<div class="fact"><div class="k">' + esc(f[0]) + '</div><div class="v">' + esc(f[1]) + '</div></div>';
+      }).join("");
+    } else {
+      if (anLive) anLive.hidden = true;
+      if (anTba) anTba.hidden = false;
+      var t = a.tba || {};
+      var anTbaStatus = $('#an-tba-status'); if (anTbaStatus) anTbaStatus.textContent = t.status || 'TO BE ANNOUNCED';
+      var anTbaBlurb = $('#an-tba-blurb'); if (anTbaBlurb) anTbaBlurb.textContent = t.blurb || '';
+      var anTbaCta = $('#an-tba-cta');
+      if (anTbaCta) { anTbaCta.childNodes[0].nodeValue = (t.ctaLabel || 'GET THE DROP') + ' '; anTbaCta.href = t.ctaUrl || '#'; }
+    }
 
     var anLineup = (a.lineup || []).map(function (act) {
       return typeof act === 'string' ? { name: act, tag: '' } : (act || {});
