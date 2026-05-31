@@ -238,8 +238,7 @@
       if (on) { pEls.forEach(function (el) { el.style.transform = ''; }); } else { parallax(); }
       if (persist) localStorage.setItem('barrel23_rm', on ? '1' : '0');
     }
-    var rmStored = localStorage.getItem('barrel23_rm');
-    setRM(rmStored === '1' || (rmStored === null && window.matchMedia('(prefers-reduced-motion: reduce)').matches), false);
+    setRM(false, false);
     rmBtn.addEventListener('click', function () { setRM(!rmOn, true); });
 
     /* ===== MEDIA PLAYER ===== */
