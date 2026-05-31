@@ -12,6 +12,10 @@ server {
 
     client_max_body_size 210M;
 
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
     # Uploads — served directly by nginx from bind-mount path
     location /uploads/ {
         alias /root/barrel23/uploads/;

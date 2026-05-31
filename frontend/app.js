@@ -111,7 +111,8 @@
     var track = $('#carousel-track'), dots = $('#carousel-dots');
     var imgs = a.images || [];
     track.innerHTML = imgs.map(function (src, i) {
-      return '<div class="carousel__slide' + (i === 0 ? ' is-on' : '') + '" style="background-image:url(' + src + ')"></div>';
+      var style = i === 0 ? ' style="background-image:url(' + src + ')"' : '';
+      return '<div class="carousel__slide' + (i === 0 ? ' is-on' : '') + '" data-bg="' + src + '"' + style + '></div>';
     }).join("");
     dots.innerHTML = imgs.map(function (_, i) { return '<i data-i="' + i + '" class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join("");
     var slides = $$('.carousel__slide', track), dotEls = $$('i', dots), ci = 0, ctimer;
@@ -128,7 +129,7 @@
     $('#events').innerHTML = C.pastEvents.map(function (e) {
       var lu = (e.lineup || []).map(function (n) { return '<b>' + esc(n) + '</b>'; }).join("");
       return '<article class="event-card reveal">' +
-        '<div class="event-card__img" style="background-image:url(' + esc(e.image) + ')"></div>' +
+        '<div class="event-card__img" data-bg="' + esc(e.image) + '"></div>' +
         '<div class="event-card__body">' +
           '<div class="event-card__date">' + esc(e.date) + ' — ' + esc(e.city || '') + '</div>' +
           '<h3 class="event-card__name">' + esc(e.name) + ' <span>// ' + esc(e.date.slice(0, 5)) + '</span></h3>' +
@@ -184,6 +185,16 @@
       ents.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
     }, { threshold: 0.12 });
     $$('.reveal').forEach(function (el) { io.observe(el); });
+
+    var bgIo = new IntersectionObserver(function (ents) {
+      ents.forEach(function (e) {
+        if (e.isIntersecting) {
+          e.target.style.backgroundImage = 'url(' + e.target.dataset.bg + ')';
+          bgIo.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: '200px' });
+    $$('[data-bg]').forEach(function (el) { if (!el.style.backgroundImage) bgIo.observe(el); });
 
     /* ===== REDUCE MOTION ===== */
     var rmBtn = $('#rm-toggle');
