@@ -337,14 +337,6 @@
       '<h2 style="margin:0 0 6px;font-size:22px">' + esc(a.eventName) + '</h2>' +
       '<div style="color:#888;font-size:12px;margin-bottom:24px">' + esc(a.date) + ' — ' + esc(a.city) + '</div>';
 
-    /* lineup preview */
-    var lu = (a.lineup || []).map(function (act) { return typeof act === 'string' ? act : act.name; }).filter(Boolean);
-    if (lu.length) {
-      var luEl = el('div'); luEl.style.cssText = 'margin-bottom:24px;font-size:12px;color:#aaa';
-      luEl.innerHTML = '<div style="color:#666;letter-spacing:2px;font-size:10px;margin-bottom:8px">LINE-UP</div>' + lu.join(', ');
-      box.appendChild(luEl);
-    }
-
     /* photo picker */
     var photoSection = el('div'); photoSection.style.marginBottom = '24px';
     photoSection.innerHTML = '<div style="color:#666;letter-spacing:2px;font-size:10px;margin-bottom:10px">ARCHIVE PHOTO</div>';
@@ -369,19 +361,43 @@
       thumbs.appendChild(t);
     });
 
-    /* manual URL input */
-    var urlWrap = el('div');
+    /* manual URL input + browse button */
+    var urlWrap = el('div'); urlWrap.style.cssText = 'display:flex;gap:6px;align-items:center';
     var urlInput = el('input'); urlInput.type = 'text'; urlInput.placeholder = 'Or paste image URL…';
-    urlInput.style.cssText = 'width:100%;box-sizing:border-box;background:#0a0a0a;border:1px solid #333;color:#fff;padding:8px 10px;font-family:inherit;font-size:12px;outline:none';
+    urlInput.style.cssText = 'flex:1;background:#0a0a0a;border:1px solid #333;color:#fff;padding:8px 10px;font-family:inherit;font-size:12px;outline:none';
     urlInput.addEventListener('input', function () {
       if (urlInput.value) { selectedPhoto = urlInput.value; photoPreview.style.backgroundImage = 'url(' + urlInput.value + ')'; }
     });
-    urlWrap.appendChild(urlInput);
+    var browseBtn = el('button', 'btn btn--sm', 'BROWSE');
+    var browseFile = el('input'); browseFile.type = 'file'; browseFile.accept = 'image/*'; browseFile.hidden = true;
+    browseBtn.addEventListener('click', function () { browseFile.click(); });
+    browseFile.addEventListener('change', function () {
+      var file = browseFile.files[0]; if (!file) return;
+      browseBtn.textContent = '…'; browseBtn.disabled = true;
+      uploadFile(file, 'gallery')
+        .then(function (data) {
+          selectedPhoto = data.url;
+          urlInput.value = data.url;
+          photoPreview.style.backgroundImage = 'url(' + data.url + ')';
+          Array.from(thumbs.children).forEach(function (c) { c.style.borderColor = '#333'; });
+          browseBtn.textContent = 'BROWSE'; browseBtn.disabled = false;
+          toast('UPLOADED ' + fmtSize(data.size_bytes));
+        })
+        .catch(function (e) { toast('UPLOAD FAILED: ' + e.message); browseBtn.textContent = 'BROWSE'; browseBtn.disabled = false; });
+    });
+    urlWrap.appendChild(urlInput); urlWrap.appendChild(browseBtn); urlWrap.appendChild(browseFile);
 
     photoSection.appendChild(photoPreview);
     if ((a.images || []).length) photoSection.appendChild(thumbs);
     photoSection.appendChild(urlWrap);
     box.appendChild(photoSection);
+
+    /* lineup editor */
+    var luData = (a.lineup || []).map(function (act) { return typeof act === 'string' ? act : act.name; }).filter(Boolean);
+    var luSection = el('div'); luSection.style.marginBottom = '24px';
+    luSection.appendChild(el('div', null, '<div style="color:#666;letter-spacing:2px;font-size:10px;margin-bottom:10px">LINE-UP</div>'));
+    luSection.appendChild(chipsEditor(luData, 'Add artist…'));
+    box.appendChild(luSection);
 
     /* buttons */
     var btnRow = el('div'); btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;margin-top:8px';
@@ -395,7 +411,7 @@
         date: a.date,
         city: a.city,
         image: selectedPhoto,
-        lineup: (a.lineup || []).map(function (act) { return typeof act === 'string' ? act : act.name; }).filter(Boolean)
+        lineup: luData
       };
       C.pastEvents.unshift(entry);
       /* reset next event to TBA */
@@ -693,6 +709,12 @@
     nf.appendChild(chipsEditor(C.nav.items, 'Add menu item…')); ncard.appendChild(nf);
     var bf = field('Brand name', C.brand.name); bind(bf._input, C.brand, 'name'); bf.style.marginTop = '16px'; ncard.appendChild(bf);
     root.appendChild(ncard);
+
+    var bcard = el('div', 'card');
+    bcard.innerHTML = '<div class="kick">BRAND</div><div class="card__head"><div><h2>Logo & Wordmark</h2><p>Paths to logo files (e.g. <code>/assets/logo.png</code> or uploaded URL).</p></div></div>';
+    bcard.appendChild(mediaField('Logo', C.brand.logo, 'image/*', function (v) { C.brand.logo = v; }, 'thumbnail'));
+    bcard.appendChild(mediaField('Wordmark', C.brand.wordmark, 'image/*', function (v) { C.brand.wordmark = v; }, 'thumbnail'));
+    root.appendChild(bcard);
   };
 
   /* ============================================================
@@ -866,28 +888,6 @@
         toast('SAVE FAILED: ' + e.message);
         $('#btn-save').textContent = 'SAVE CHANGES';
       });
-  });
-
-  /* Export */
-  $('#btn-export').addEventListener('click', function () {
-    var blob = new Blob([JSON.stringify(C, null, 2)], { type: 'application/json' });
-    var url = URL.createObjectURL(blob);
-    var a = el('a'); a.href = url; a.download = 'barrel23-content.json'; a.click();
-    URL.revokeObjectURL(url); toast('EXPORTED barrel23-content.json');
-  });
-
-  /* Import */
-  $('#imp-file').addEventListener('change', function (e) {
-    var file = e.target.files[0]; if (!file) return;
-    var r = new FileReader();
-    r.onload = function () {
-      try {
-        var o = JSON.parse(r.result);
-        C = Object.assign(C, o);
-        route(current); setDirty(true); toast('IMPORTED — CLICK SAVE TO APPLY');
-      } catch (err) { toast('INVALID JSON'); }
-    };
-    r.readAsText(file);
   });
 
   /* Reset */
