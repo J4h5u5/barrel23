@@ -91,7 +91,7 @@
     });
   }
 
-  function uploadFile(file, preset) {
+  function uploadFile(file, preset, onProgress) {
     preset = preset || 'gallery';
     var fd = new FormData();
     fd.append('file', file);
@@ -100,6 +100,7 @@
       var xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/media/upload');
       xhr.setRequestHeader('Authorization', 'Bearer ' + getToken());
+      if (onProgress) xhr.upload.onprogress = function (e) { if (e.lengthComputable) onProgress(e.loaded / e.total); };
       xhr.onload = function () {
         if (xhr.status === 200) resolve(JSON.parse(xhr.responseText));
         else reject(new Error('Upload failed: ' + xhr.status));
@@ -107,6 +108,21 @@
       xhr.onerror = function () { reject(new Error('Upload error')); };
       xhr.send(fd);
     });
+  }
+
+  /* Shows an inline progress bar inside a button during upload */
+  function withProgress(btn, promise) {
+    var bar = el('div');
+    bar.style.cssText = 'position:absolute;bottom:0;left:0;height:2px;background:var(--red);width:0;transition:width .1s';
+    btn.style.position = 'relative'; btn.style.overflow = 'hidden';
+    btn.appendChild(bar);
+    btn.disabled = true;
+    var origText = btn.textContent;
+    return {
+      progress: function (pct) { bar.style.width = (pct * 100) + '%'; btn.textContent = Math.round(pct * 100) + '%'; btn.appendChild(bar); },
+      done: function () { btn.disabled = false; btn.textContent = origText; if (bar.parentNode) bar.parentNode.removeChild(bar); },
+      fail: function () { btn.disabled = false; btn.textContent = origText; if (bar.parentNode) bar.parentNode.removeChild(bar); }
+    };
   }
 
   function resizeFile(fileId, preset) {
@@ -212,17 +228,17 @@
     fileInput.addEventListener('change', function () {
       var file = fileInput.files[0]; if (!file) return;
       var selectedPreset = presetSel ? presetSel.value : 'original';
-      uploadBtn.textContent = '…'; uploadBtn.disabled = true;
-      uploadFile(file, selectedPreset)
+      var p = withProgress(uploadBtn, null);
+      uploadFile(file, selectedPreset, p.progress)
         .then(function (data) {
+          p.done();
           urlInput.value = data.url;
           prev.style.backgroundImage = 'url(' + data.url + ')';
           onChange(data.url); setDirty(true);
-          uploadBtn.textContent = 'UPLOAD'; uploadBtn.disabled = false;
           var saved = data.saved_bytes > 0 ? ' (saved ' + fmtSize(data.saved_bytes) + ')' : '';
           toast('UPLOADED ' + fmtSize(data.size_bytes) + saved);
         })
-        .catch(function (e) { toast('UPLOAD FAILED: ' + e.message); uploadBtn.textContent = 'UPLOAD'; uploadBtn.disabled = false; });
+        .catch(function (e) { p.fail(); toast('UPLOAD FAILED: ' + e.message); });
     });
 
     row.appendChild(uploadBtn); row.appendChild(fileInput);
@@ -383,17 +399,17 @@
     browseBtn.addEventListener('click', function () { browseFile.click(); });
     browseFile.addEventListener('change', function () {
       var file = browseFile.files[0]; if (!file) return;
-      browseBtn.textContent = '…'; browseBtn.disabled = true;
-      uploadFile(file, 'gallery')
+      var p = withProgress(browseBtn, null);
+      uploadFile(file, 'gallery', p.progress)
         .then(function (data) {
+          p.done();
           selectedPhoto = data.url;
           urlInput.value = data.url;
           photoPreview.style.backgroundImage = 'url(' + data.url + ')';
           Array.from(thumbs.children).forEach(function (c) { c.style.borderColor = '#333'; });
-          browseBtn.textContent = 'BROWSE'; browseBtn.disabled = false;
           toast('UPLOADED ' + fmtSize(data.size_bytes));
         })
-        .catch(function (e) { toast('UPLOAD FAILED: ' + e.message); browseBtn.textContent = 'BROWSE'; browseBtn.disabled = false; });
+        .catch(function (e) { p.fail(); toast('UPLOAD FAILED: ' + e.message); });
     });
     urlWrap.appendChild(urlInput); urlWrap.appendChild(browseBtn); urlWrap.appendChild(browseFile);
 
@@ -769,16 +785,16 @@
     uploadBtn.addEventListener('click', function () { fileInp.click(); });
     fileInp.addEventListener('change', function () {
       var files = Array.prototype.slice.call(fileInp.files); if (!files.length) return;
-      var done = 0;
-      uploadBtn.disabled = true; progress.textContent = '0 / ' + files.length;
+      var done = 0; var total = files.length;
+      var p = withProgress(uploadBtn, null);
       files.forEach(function (file) {
-        uploadFile(file, 'gallery').then(function (data) {
+        uploadFile(file, 'gallery', function (pct) { p.progress((done + pct) / total); }).then(function (data) {
           gallery.push(data.url); done++;
-          progress.textContent = done + ' / ' + files.length;
-          if (done === files.length) { uploadBtn.disabled = false; progress.textContent = ''; renderGrid(); setDirty(true); }
+          p.progress(done / total);
+          if (done === total) { p.done(); renderGrid(); setDirty(true); }
         }).catch(function (e) {
           done++; toast('UPLOAD FAILED: ' + e.message);
-          if (done === files.length) { uploadBtn.disabled = false; progress.textContent = ''; }
+          if (done === total) p.fail();
         });
       });
     });
@@ -1004,12 +1020,12 @@
         uploadBtn.addEventListener('click', function () { fileIn.click(); });
         fileIn.addEventListener('change', function () {
           var file = fileIn.files[0]; if (!file) return;
-          uploadBtn.textContent = 'UPLOADING…'; uploadBtn.disabled = true;
-          uploadFile(file)
+          var p = withProgress(uploadBtn, null);
+          uploadFile(file, 'original', p.progress)
             .then(function (data) {
+              p.done();
               st.audioUrl = data.url;
               if (!st.duration || st.duration === 3600) {
-                // Try to read duration from audio element
                 var tmp = new Audio(data.url);
                 tmp.onloadedmetadata = function () {
                   st.duration = Math.round(tmp.duration);
@@ -1018,10 +1034,9 @@
                 };
               }
               urlSpan.textContent = data.original_name;
-              uploadBtn.textContent = 'UPLOAD MP3'; uploadBtn.disabled = false;
               setDirty(true); toast('UPLOADED: ' + data.original_name);
             })
-            .catch(function (e) { toast('UPLOAD FAILED: ' + e.message); uploadBtn.textContent = 'UPLOAD MP3'; uploadBtn.disabled = false; });
+            .catch(function (e) { p.fail(); toast('UPLOAD FAILED: ' + e.message); });
         });
         audioWrap.appendChild(urlSpan); audioWrap.appendChild(uploadBtn); audioWrap.appendChild(fileIn);
         af.appendChild(audioWrap); body.appendChild(af);
@@ -1202,17 +1217,17 @@
     upBtn.addEventListener('click', function () { upFile.click(); });
     upFile.addEventListener('change', function () {
       var file = upFile.files[0]; if (!file) return;
-      upBtn.textContent = 'UPLOADING…'; upBtn.disabled = true;
-      uploadFile(file, upPreset.value)
+      var p = withProgress(upBtn, null);
+      uploadFile(file, upPreset.value, p.progress)
         .then(function (data) {
+          p.done();
           var saved = data.saved_bytes > 0 ? ' (saved ' + fmtSize(data.saved_bytes) + ')' : '';
           toast('UPLOADED ' + fmtSize(data.size_bytes) + saved);
-          upBtn.textContent = 'CHOOSE FILE'; upBtn.disabled = false;
           activeFilter = data.category;
           $$('button', tabs).forEach(function (b, i) { b.classList.toggle('btn--primary', ['image','audio','video'][i] === data.category); });
           loadMedia();
         })
-        .catch(function (e) { toast('FAILED: ' + e.message); upBtn.textContent = 'CHOOSE FILE'; upBtn.disabled = false; });
+        .catch(function (e) { p.fail(); toast('FAILED: ' + e.message); });
     });
     upRow.appendChild(upPreset); upRow.appendChild(upBtn); upRow.appendChild(upFile);
     uploadCard.appendChild(upRow);
