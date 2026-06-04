@@ -925,6 +925,56 @@
     root.appendChild(card);
   };
 
+  /* editable field with a suggest-dropdown populated from a list */
+  function suggestField(labelText, value, getSuggestions, obj, key) {
+    var f = el('div', 'field');
+    f.appendChild(el('label', null, labelText));
+    var wrap = el('div'); wrap.style.cssText = 'position:relative;display:flex;gap:0';
+
+    var inp = el('input'); inp.type = 'text'; inp.value = value || '';
+    inp.style.cssText = 'flex:1;border-right:none;border-radius:0';
+    inp.addEventListener('input', function () { obj[key] = inp.value; setDirty(true); });
+
+    var toggleBtn = el('button');
+    toggleBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+    toggleBtn.style.cssText = 'background:#0a0a0a;border:1px solid #333;border-left:none;padding:0 10px;color:#888;cursor:pointer;flex-shrink:0';
+
+    var dropdown = el('div');
+    dropdown.style.cssText = 'position:absolute;top:100%;left:0;right:0;background:#111;border:1px solid #444;border-top:none;z-index:50;max-height:200px;overflow-y:auto;display:none';
+
+    function buildDropdown() {
+      dropdown.innerHTML = '';
+      var items = getSuggestions();
+      if (!items.length) {
+        var none = el('div'); none.style.cssText = 'padding:10px 12px;color:#555;font-family:var(--mono);font-size:12px';
+        none.textContent = 'No suggestions'; dropdown.appendChild(none); return;
+      }
+      items.forEach(function (text) {
+        var item = el('div'); item.textContent = text;
+        item.style.cssText = 'padding:9px 12px;cursor:pointer;font-family:var(--mono);font-size:13px;border-bottom:1px solid #222;transition:background .15s';
+        item.addEventListener('mouseenter', function () { item.style.background = '#1a1a1a'; });
+        item.addEventListener('mouseleave', function () { item.style.background = ''; });
+        item.addEventListener('click', function () {
+          inp.value = text; obj[key] = text; setDirty(true);
+          dropdown.style.display = 'none';
+        });
+        dropdown.appendChild(item);
+      });
+    }
+
+    toggleBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      buildDropdown();
+      dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    });
+    document.addEventListener('click', function () { dropdown.style.display = 'none'; });
+
+    wrap.appendChild(inp); wrap.appendChild(toggleBtn); wrap.appendChild(dropdown);
+    f.appendChild(wrap);
+    f._input = inp;
+    return f;
+  }
+
   panels.sets = function (root) {
     var card = el('div', 'card');
     card.innerHTML = '<div class="kick">MEDIA PLAYER</div><div class="card__head"><div><h2>Audio Sets</h2><p>Upload MP3 files for the floating player.</p></div></div>';
@@ -937,8 +987,8 @@
         var body = el('div');
         var g = el('div', 'grid cols-2');
         var f1 = field('Title', st.title); bind(f1._input, st, 'title');
-        var f2 = field('DJ', st.dj); bind(f2._input, st, 'dj');
-        var f3 = field('Event', st.event); bind(f3._input, st, 'event');
+        var f2 = suggestField('DJ', st.dj, function () { return (C.djs || []).map(function (d) { return d.name; }).filter(Boolean); }, st, 'dj');
+        var f3 = suggestField('Event', st.event, function () { return (C.pastEvents || []).map(function (e) { return e.name; }).filter(Boolean); }, st, 'event');
         var f4 = field('Duration (mm:ss)', fmt(st.duration), { mono: true });
         f4._input.addEventListener('input', function () { st.duration = parse(f4._input.value); setDirty(true); });
         g.appendChild(f1); g.appendChild(f2); g.appendChild(f3); g.appendChild(f4); body.appendChild(g);
