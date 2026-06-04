@@ -80,20 +80,30 @@ async def upload_file(
     if not category:
         raise HTTPException(400, f"File type not allowed: {mime}")
 
-    content = await file.read()
-    original_size = len(content)
+    raw = await file.read()
+    original_size = len(raw)
     max_bytes = settings.max_upload_mb * 1024 * 1024
     if original_size > max_bytes:
         raise HTTPException(400, f"File exceeds {settings.max_upload_mb} MB limit")
 
     # Optimize images → WebP
+    thumb_url = None
     if category == "image" and preset != "original":
         try:
-            content, ext = _optimize_image(content, preset)
+            content, ext = _optimize_image(raw, preset)
             mime = "image/webp"
         except Exception as e:
             raise HTTPException(422, f"Image processing failed: {e}")
+        # Auto-create thumbnail when uploading gallery images
+        if preset == "gallery":
+            try:
+                thumb_content, thumb_ext = _optimize_image(raw, "thumbnail")
+                thumb_filename = _save_file(thumb_content, category, thumb_ext)
+                thumb_url = f"/uploads/{category}/{thumb_filename}"
+            except Exception:
+                pass  # thumbnail failure is non-fatal
     else:
+        content = raw
         ext = Path(file.filename or "file").suffix.lstrip(".").lower() or "bin"
 
     filename = _save_file(content, category, ext)
@@ -112,6 +122,7 @@ async def upload_file(
     return {
         "id": record.id,
         "url": f"/uploads/{category}/{filename}",
+        "thumb_url": thumb_url,
         "filename": filename,
         "original_name": file.filename,
         "category": category,

@@ -752,12 +752,15 @@
     var wrap = el('div');
     var grid = el('div'); grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px';
 
+    function galThumb(item) { return typeof item === 'string' ? item : (item.thumb || item.url || item); }
+    function galUrl(item)   { return typeof item === 'string' ? item : (item.url || item); }
+
     function renderGrid() {
       grid.innerHTML = '';
-      gallery.forEach(function (src, i) {
+      gallery.forEach(function (item, i) {
         var thumb = el('div');
         thumb.style.cssText = 'position:relative;width:80px;height:60px;background:#0a0a0a center/cover no-repeat;border:1px solid #333;flex-shrink:0';
-        thumb.style.backgroundImage = 'url(' + src + ')';
+        thumb.style.backgroundImage = 'url(' + galThumb(item) + ')';
         var del = el('button');
         del.textContent = '×'; del.style.cssText = 'position:absolute;top:2px;right:2px;background:var(--red);color:#fff;border:none;width:18px;height:18px;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center';
         del.addEventListener('click', function () { gallery.splice(i, 1); renderGrid(); setDirty(true); });
@@ -773,7 +776,7 @@
     var addUrlBtn = el('button', 'btn btn--sm', 'ADD URL');
     addUrlBtn.addEventListener('click', function () {
       var v = urlInp.value.trim(); if (!v) return;
-      gallery.push(v); urlInp.value = ''; renderGrid(); setDirty(true);
+      gallery.push({ url: v, thumb: v }); urlInp.value = ''; renderGrid(); setDirty(true);
     });
     urlRow.appendChild(urlInp); urlRow.appendChild(addUrlBtn);
 
@@ -789,7 +792,7 @@
       var p = withProgress(uploadBtn, null);
       files.forEach(function (file) {
         uploadFile(file, 'gallery', function (pct) { p.progress((done + pct) / total); }).then(function (data) {
-          gallery.push(data.url); done++;
+          gallery.push({ url: data.url, thumb: data.thumb_url || data.url }); done++;
           p.progress(done / total);
           if (done === total) { p.done(); renderGrid(); setDirty(true); }
         }).catch(function (e) {

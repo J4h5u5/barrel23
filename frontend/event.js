@@ -93,17 +93,20 @@
         }).join('');
       }
 
-      /* gallery */
+      /* gallery helpers — items can be {url, thumb} or plain string */
       var gallery = ev.gallery || [];
+      function galUrl(item)   { return typeof item === 'string' ? item : (item.url   || item); }
+      function galThumb(item) { return typeof item === 'string' ? item : (item.thumb || item.url || item); }
+
       var galSec = $('#ev-gallery-sec');
       if (!gallery.length) { galSec.hidden = true; }
       else {
         $('#ev-shot-count').textContent = '[ ' + pad(gallery.length) + ' FRAMES ]';
-        $('#ev-gallery').innerHTML = gallery.map(function (src, i) {
+        $('#ev-gallery').innerHTML = gallery.map(function (item, i) {
+          var thumb = galThumb(item);
           return '<button class="ev-shot" data-i="' + i + '" aria-label="Open photo ' + (i + 1) + '">' +
-            '<img src="' + esc(src) + '" alt="' + esc(ev.name) + ' frame ' + (i + 1) + '" loading="lazy"></button>';
+            '<img src="' + esc(thumb) + '" alt="' + esc(ev.name) + ' frame ' + (i + 1) + '" loading="lazy"></button>';
         }).join('');
-        /* remove placeholder aspect-ratio once each image loads */
         $$('img', $('#ev-gallery')).forEach(function (img) {
           if (img.complete) { img.classList.add('loaded'); }
           else { img.addEventListener('load', function () { img.classList.add('loaded'); }); }
@@ -113,14 +116,21 @@
       /* lightbox */
       var lb = $('#lightbox'), lbImg = $('#lb-img'), lbCount = $('#lb-count');
       var lbIndex = 0;
+      var preloadImg = new Image(); // reusable preload slot
+
+      function preloadNext(i) {
+        var next = ((i + 1) % gallery.length);
+        preloadImg.src = galUrl(gallery[next]);
+      }
+
       function openLb(i) {
         lbIndex = ((i % gallery.length) + gallery.length) % gallery.length;
-        /* clear src first so browser doesn't flash previous image */
         lbImg.removeAttribute('src');
-        lbImg.src = gallery[lbIndex];
+        lbImg.src = galUrl(gallery[lbIndex]);
         lbCount.innerHTML = '<b>' + pad(lbIndex + 1) + '</b> / ' + pad(gallery.length);
         lb.classList.add('open'); lb.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
+        preloadNext(lbIndex);
       }
       function closeLb() { lb.classList.remove('open'); lb.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
       /* use mousedown index to avoid layout-shift between mousedown and click */
