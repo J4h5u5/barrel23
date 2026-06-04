@@ -268,7 +268,16 @@
     var foot = el('div', 'item__foot');
     var del = el('button', 'btn btn--sm btn--danger', 'DELETE');
     del.addEventListener('click', onDelete);
-    foot.appendChild(del); body.appendChild(foot);
+    var save = el('button', 'btn btn--sm btn--primary', 'SAVE');
+    save.addEventListener('click', function () {
+      save.textContent = '…'; save.disabled = true;
+      saveContent().then(function () {
+        setDirty(false); toast('SAVED'); save.textContent = 'SAVE'; save.disabled = false;
+      }).catch(function (e) {
+        toast('SAVE FAILED: ' + e.message); save.textContent = 'SAVE'; save.disabled = false;
+      });
+    });
+    foot.appendChild(del); foot.appendChild(save); body.appendChild(foot);
     item.appendChild(bar); item.appendChild(body);
     return item;
   }
@@ -593,9 +602,81 @@
     addBtn.addEventListener('click', doAdd);
     nameInp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
 
-    addRow.appendChild(nameInp); addRow.appendChild(roleInp); addRow.appendChild(addBtn); addRow.appendChild(dl);
+    /* new DJ button */
+    var newDjBtn = el('button', 'btn btn--sm', '+ NEW DJ');
+    newDjBtn.style.marginLeft = 'auto';
+    newDjBtn.addEventListener('click', function () { openNewDJModal(function (dj) {
+      /* add to lineup automatically */
+      lineup.push({ name: dj.name, role: dj.role || 'GUEST' });
+      /* refresh datalist */
+      var o = el('option'); o.value = dj.name; dl.appendChild(o);
+      renderChips(); setDirty(true);
+    }); });
+
+    addRow.appendChild(nameInp); addRow.appendChild(roleInp); addRow.appendChild(addBtn); addRow.appendChild(newDjBtn); addRow.appendChild(dl);
     wrap.appendChild(chips); wrap.appendChild(addRow);
     return wrap;
+  }
+
+  /* -------- New DJ modal (create DJ + add to C.djs) -------- */
+  function openNewDJModal(onCreated) {
+    var overlay = el('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1100;display:flex;align-items:center;justify-content:center;padding:24px';
+    var box = el('div');
+    box.style.cssText = 'background:#111;border:1px solid #333;padding:32px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;font-family:var(--mono)';
+    box.innerHTML = '<div style="color:var(--red);font-size:11px;letter-spacing:3px;margin-bottom:20px">NEW DJ / ARTIST</div>';
+
+    var dj = { name: '', role: 'GUEST', image: '', socials: {} };
+
+    var g = el('div', 'grid cols-2');
+    var fn = field('Name', ''); fn._input.addEventListener('input', function () { dj.name = fn._input.value; });
+    var fr = field('Role / Status', 'GUEST'); fr._input.addEventListener('input', function () { dj.role = fr._input.value; }); dj.role = 'GUEST';
+    g.appendChild(fn); g.appendChild(fr);
+    box.appendChild(g);
+
+    var imgF = mediaField('Photo', '', 'image/*', function (v) { dj.image = v; }, 'portrait');
+    imgF.style.marginTop = '16px';
+    box.appendChild(imgF);
+
+    var socLabel = el('div'); socLabel.style.cssText = 'color:#666;font-size:10px;letter-spacing:2px;margin:18px 0 10px';
+    socLabel.textContent = 'SOCIAL LINKS';
+    box.appendChild(socLabel);
+    var sg = el('div', 'grid cols-2');
+    ['instagram', 'soundcloud', 'telegram', 'tiktok', 'youtube'].forEach(function (k) {
+      var sf = field(k.charAt(0).toUpperCase() + k.slice(1), '');
+      sf._input.placeholder = 'URL…';
+      sf._input.style.fontFamily = 'var(--mono)'; sf._input.style.fontSize = '12px';
+      sf._input.addEventListener('input', function () { dj.socials[k] = sf._input.value; });
+      sg.appendChild(sf);
+    });
+    box.appendChild(sg);
+
+    var btnRow = el('div'); btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;margin-top:24px';
+    var cancelBtn = el('button', 'btn btn--sm', 'CANCEL');
+    var confirmBtn = el('button', 'btn btn--sm', 'CREATE DJ');
+    confirmBtn.style.background = 'var(--red)';
+
+    cancelBtn.addEventListener('click', function () { document.body.removeChild(overlay); });
+    confirmBtn.addEventListener('click', function () {
+      if (!dj.name.trim()) { toast('NAME REQUIRED'); return; }
+      dj.name = dj.name.trim();
+      C.djs.push(dj);
+      document.body.removeChild(overlay);
+      setDirty(true);
+      /* save immediately so DJ is in DB */
+      saveContent().then(function () {
+        toast('DJ SAVED: ' + dj.name);
+        setDirty(false);
+        if (onCreated) onCreated(dj);
+      }).catch(function (e) { toast('SAVE FAILED: ' + e.message); if (onCreated) onCreated(dj); });
+    });
+
+    btnRow.appendChild(cancelBtn); btnRow.appendChild(confirmBtn);
+    box.appendChild(btnRow);
+    overlay.appendChild(box);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) document.body.removeChild(overlay); });
+    document.body.appendChild(overlay);
+    fn._input.focus();
   }
 
   /* -------- gallery editor (multi-photo) -------- */
