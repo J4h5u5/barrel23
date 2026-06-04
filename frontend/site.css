@@ -348,6 +348,9 @@ button{ font-family: inherit; cursor: pointer; }
 .player__eq i:nth-child(2){ animation-delay:.2s !important; }
 .player__eq i:nth-child(3){ animation-delay:.45s !important; }
 @keyframes eq{ 0%,100%{ height:25%; } 50%{ height:100%; } }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+.player.loading .player__btn svg{ animation: spin .8s linear infinite; }
+.player.loading .player__eq i{ animation: none; height: 30%; opacity:.4; }
 .player__list-btn{ background:transparent; border:1px solid var(--line); color: var(--ink-dim);
   font-family:var(--mono); font-size:11px; letter-spacing:.16em; padding:9px 12px; flex:none; }
 .player__list-btn:hover{ border-color: var(--red); color: var(--red); }

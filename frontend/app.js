@@ -333,7 +333,16 @@
       scWidget = null; scReady = false;
     }
 
+    function setLoading(on) {
+      playerEl.classList.toggle('loading', on);
+      if (on) {
+        playerEl.classList.remove('playing');
+        playBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="animation:spin .8s linear infinite"><path d="M12 2a10 10 0 0 1 10 10h-2a8 8 0 0 0-8-8V2z"/></svg>';
+      }
+    }
+
     function playSC(url, startAt) {
+      setLoading(true);
       loadSCApi(function () {
         var frame = getOrCreateSCFrame(url);
         scReady = false;
@@ -346,9 +355,18 @@
           if (startAt > 0) scWidget.seekTo(startAt * 1000);
           scWidget.play();
         });
+        scWidget.bind(window.SC.Widget.Events.PLAY, function () {
+          /* audio actually started — now show playing state */
+          setLoading(false);
+          playerEl.classList.add('playing');
+          playBtn.innerHTML = iconPause;
+        });
         scWidget.bind(window.SC.Widget.Events.PLAY_PROGRESS, function (data) {
           P.t = data.currentPosition / 1000;
           renderProgress(); save();
+        });
+        scWidget.bind(window.SC.Widget.Events.PAUSE, function () {
+          if (P.playing) { /* SC paused on its own — sync state */ P.playing = false; playerEl.classList.remove('playing'); playBtn.innerHTML = iconPlay; }
         });
         scWidget.bind(window.SC.Widget.Events.FINISH, function () {
           load(P.i + 1, true);
