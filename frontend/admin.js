@@ -1009,9 +1009,16 @@
         f4._input.addEventListener('input', function () { st.duration = parse(f4._input.value); setDirty(true); });
         g.appendChild(f1); g.appendChild(f2); g.appendChild(f3); g.appendChild(f4); body.appendChild(g);
 
-        /* audio upload */
+        /* soundcloud URL */
+        var scf = field('SoundCloud URL', st.soundcloudUrl || '', { mono: true, placeholder: 'https://soundcloud.com/artist/track' });
+        scf.style.marginTop = '16px';
+        bind(scf._input, st, 'soundcloudUrl');
+        scf.appendChild(el('div', 'hint', 'Paste a SoundCloud track or set URL. Takes priority over MP3.'));
+        body.appendChild(scf);
+
+        /* audio upload (fallback if no SC url) */
         var af = el('div', 'field'); af.style.marginTop = '16px';
-        af.appendChild(el('label', null, 'AUDIO FILE'));
+        af.appendChild(el('label', null, 'MP3 FILE (fallback)'));
         var audioWrap = el('div'); audioWrap.style.display = 'flex'; audioWrap.style.alignItems = 'center'; audioWrap.style.gap = '12px';
         var urlSpan = el('span'); urlSpan.style.fontFamily = 'var(--mono)'; urlSpan.style.fontSize = '12px'; urlSpan.style.color = '#888';
         urlSpan.textContent = st.audioUrl || 'No file uploaded';
