@@ -546,23 +546,166 @@
     applyState();
   };
 
+  /* -------- lineup editor with DJ-picker -------- */
+  function lineupEditor(lineup) {
+    var wrap = el('div');
+
+    /* existing entries */
+    var chips = el('div', 'chips');
+    function renderChips() {
+      chips.innerHTML = '';
+      lineup.forEach(function (entry, i) {
+        var name = typeof entry === 'string' ? entry : (entry.name || '');
+        var role = typeof entry === 'object' ? (entry.role || '') : '';
+        var c = el('span', 'chip');
+        c.innerHTML = '<span>' + esc(name) + (role ? ' <em style="color:#888;font-style:normal">· ' + esc(role) + '</em>' : '') + '</span>';
+        var b = el('button', null, '×');
+        b.addEventListener('click', function () { lineup.splice(i, 1); renderChips(); setDirty(true); });
+        c.appendChild(b); chips.appendChild(c);
+      });
+    }
+    renderChips();
+
+    /* add row: pick from residents OR type new name */
+    var addRow = el('div', 'addrow'); addRow.style.flexWrap = 'wrap'; addRow.style.gap = '6px';
+    var djNames = (C.djs || []).map(function (d) { return d.name; }).filter(Boolean);
+
+    var nameInp = el('input'); nameInp.type = 'text'; nameInp.placeholder = 'Artist name…';
+    nameInp.style.cssText = 'flex:1;min-width:120px;font-family:var(--mono);font-size:13px';
+
+    var roleInp = el('input'); roleInp.type = 'text'; roleInp.placeholder = 'Role (optional)';
+    roleInp.style.cssText = 'width:130px;font-family:var(--mono);font-size:13px';
+
+    /* datalist for autocomplete from residents */
+    var dlId = 'dj-dl-' + Math.random().toString(36).slice(2);
+    var dl = el('datalist'); dl.id = dlId;
+    djNames.forEach(function (n) { var o = el('option'); o.value = n; dl.appendChild(o); });
+    nameInp.setAttribute('list', dlId);
+
+    var addBtn = el('button', 'btn btn--sm', 'ADD');
+    function doAdd() {
+      var name = nameInp.value.trim(); if (!name) return;
+      var role = roleInp.value.trim();
+      lineup.push(role ? { name: name, role: role } : name);
+      nameInp.value = ''; roleInp.value = '';
+      renderChips(); setDirty(true);
+    }
+    addBtn.addEventListener('click', doAdd);
+    nameInp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
+
+    addRow.appendChild(nameInp); addRow.appendChild(roleInp); addRow.appendChild(addBtn); addRow.appendChild(dl);
+    wrap.appendChild(chips); wrap.appendChild(addRow);
+    return wrap;
+  }
+
+  /* -------- gallery editor (multi-photo) -------- */
+  function galleryEditor(gallery) {
+    var wrap = el('div');
+    var grid = el('div'); grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px';
+
+    function renderGrid() {
+      grid.innerHTML = '';
+      gallery.forEach(function (src, i) {
+        var thumb = el('div');
+        thumb.style.cssText = 'position:relative;width:80px;height:60px;background:#0a0a0a center/cover no-repeat;border:1px solid #333;flex-shrink:0';
+        thumb.style.backgroundImage = 'url(' + src + ')';
+        var del = el('button');
+        del.textContent = '×'; del.style.cssText = 'position:absolute;top:2px;right:2px;background:var(--red);color:#fff;border:none;width:18px;height:18px;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center';
+        del.addEventListener('click', function () { gallery.splice(i, 1); renderGrid(); setDirty(true); });
+        thumb.appendChild(del); grid.appendChild(thumb);
+      });
+    }
+    renderGrid();
+
+    /* add by URL */
+    var urlRow = el('div'); urlRow.style.cssText = 'display:flex;gap:6px;margin-bottom:6px';
+    var urlInp = el('input'); urlInp.type = 'text'; urlInp.placeholder = 'Paste image URL…';
+    urlInp.style.cssText = 'flex:1;background:#0a0a0a;border:1px solid #333;color:#fff;padding:7px 10px;font-family:var(--mono);font-size:12px;outline:none';
+    var addUrlBtn = el('button', 'btn btn--sm', 'ADD URL');
+    addUrlBtn.addEventListener('click', function () {
+      var v = urlInp.value.trim(); if (!v) return;
+      gallery.push(v); urlInp.value = ''; renderGrid(); setDirty(true);
+    });
+    urlRow.appendChild(urlInp); urlRow.appendChild(addUrlBtn);
+
+    /* upload from disk (multiple) */
+    var uploadRow = el('div'); uploadRow.style.cssText = 'display:flex;gap:6px;align-items:center';
+    var uploadBtn = el('button', 'btn btn--sm', 'UPLOAD PHOTOS');
+    var fileInp = el('input'); fileInp.type = 'file'; fileInp.accept = 'image/*'; fileInp.multiple = true; fileInp.hidden = true;
+    var progress = el('span'); progress.style.cssText = 'font-family:var(--mono);font-size:11px;color:#888';
+    uploadBtn.addEventListener('click', function () { fileInp.click(); });
+    fileInp.addEventListener('change', function () {
+      var files = Array.prototype.slice.call(fileInp.files); if (!files.length) return;
+      var done = 0;
+      uploadBtn.disabled = true; progress.textContent = '0 / ' + files.length;
+      files.forEach(function (file) {
+        uploadFile(file, 'gallery').then(function (data) {
+          gallery.push(data.url); done++;
+          progress.textContent = done + ' / ' + files.length;
+          if (done === files.length) { uploadBtn.disabled = false; progress.textContent = ''; renderGrid(); setDirty(true); }
+        }).catch(function (e) {
+          done++; toast('UPLOAD FAILED: ' + e.message);
+          if (done === files.length) { uploadBtn.disabled = false; progress.textContent = ''; }
+        });
+      });
+    });
+    uploadRow.appendChild(uploadBtn); uploadRow.appendChild(fileInp); uploadRow.appendChild(progress);
+
+    wrap.appendChild(grid); wrap.appendChild(urlRow); wrap.appendChild(uploadRow);
+    return wrap;
+  }
+
+  function slugify(str) {
+    return String(str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || ('ev-' + Date.now());
+  }
+
   panels.events = function (root) {
     var card = el('div', 'card');
-    card.innerHTML = '<div class="kick">BLOCK 03 · ARCHIVE</div><div class="card__head"><div><h2>Past Events</h2></div></div>';
+    card.innerHTML = '<div class="kick">BLOCK 03 · ARCHIVE</div><div class="card__head"><div><h2>Past Events</h2><p>Last 5 events are shown on the main page. All events are accessible via /archive.html.</p></div></div>';
     var list = el('div');
     function render() {
       list.innerHTML = '';
       C.pastEvents.forEach(function (ev, i) {
+        /* ensure required fields */
+        if (!ev.id) ev.id = slugify(ev.name + '-' + ev.date);
+        ev.lineup = ev.lineup || [];
+        ev.gallery = ev.gallery || [];
+
         var body = el('div');
+
+        /* row 1: name, date, city, venue */
         var g = el('div', 'grid cols-2');
         var f1 = field('Event name', ev.name); bind(f1._input, ev, 'name');
-        var f2 = field('Date', ev.date, { mono: true }); bind(f2._input, ev, 'date');
+        var f2 = field('Date', ev.date, { mono: true, placeholder: 'DD.MM.YYYY' }); bind(f2._input, ev, 'date');
         var f3 = field('City', ev.city); bind(f3._input, ev, 'city');
-        g.appendChild(f1); g.appendChild(f2); g.appendChild(f3); body.appendChild(g);
-        var img = mediaField('Photo', ev.image, 'image/*', function (v) { ev.image = v; }); img.style.marginTop = '16px'; body.appendChild(img);
-        var lu = el('div', 'field'); lu.style.marginTop = '16px';
-        lu.appendChild(el('label', null, 'LINEUP')); ev.lineup = ev.lineup || [];
-        lu.appendChild(chipsEditor(ev.lineup, 'Add DJ…')); body.appendChild(lu);
+        var f4 = field('Venue', ev.venue); bind(f4._input, ev, 'venue');
+        var f5 = field('Doors / time', ev.doors, { mono: true }); bind(f5._input, ev, 'doors');
+        var f6 = field('URL slug (auto)', ev.id, { mono: true }); bind(f6._input, ev, 'id');
+        g.appendChild(f1); g.appendChild(f2); g.appendChild(f3); g.appendChild(f4); g.appendChild(f5); g.appendChild(f6);
+        body.appendChild(g);
+
+        /* description */
+        var desc = field('Description', ev.description || '', { textarea: true, rows: 3 });
+        desc.style.marginTop = '16px';
+        bind(desc._input, ev, 'description');
+        body.appendChild(desc);
+
+        /* cover photo */
+        var img = mediaField('Cover photo', ev.image, 'image/*', function (v) { ev.image = v; }, 'gallery');
+        img.style.marginTop = '16px'; body.appendChild(img);
+
+        /* lineup */
+        var luWrap = el('div', 'field'); luWrap.style.marginTop = '16px';
+        luWrap.appendChild(el('label', null, 'LINE-UP'));
+        luWrap.appendChild(lineupEditor(ev.lineup));
+        body.appendChild(luWrap);
+
+        /* gallery */
+        var galWrap = el('div', 'field'); galWrap.style.marginTop = '16px';
+        galWrap.appendChild(el('label', null, 'GALLERY (' + ev.gallery.length + ' photos)'));
+        galWrap.appendChild(galleryEditor(ev.gallery));
+        body.appendChild(galWrap);
+
         list.appendChild(repeatItem(i, ev.name + ' — ' + ev.date, (ev.lineup || []).length + ' artists', body, function () {
           C.pastEvents.splice(i, 1); render(); setDirty(true);
         }));
@@ -570,7 +713,11 @@
     }
     render();
     var add = el('button', 'btn btn--full', '+ ADD PAST EVENT');
-    add.addEventListener('click', function () { C.pastEvents.push({ name: 'COVEN', date: '01.01.2026', city: 'DUBAI', image: '', lineup: [] }); render(); setDirty(true); });
+    add.addEventListener('click', function () {
+      var ev = { id: '', name: 'COVEN', date: '', city: 'DUBAI', venue: '', doors: '', description: '', image: '', lineup: [], gallery: [] };
+      ev.id = slugify(ev.name + '-' + Date.now());
+      C.pastEvents.push(ev); render(); setDirty(true);
+    });
     card.appendChild(list); card.appendChild(add);
     root.appendChild(card);
   };
@@ -590,9 +737,11 @@
         g.appendChild(f1); g.appendChild(f2); body.appendChild(g);
         var img = mediaField('Portrait', dj.image, 'image/*', function (v) { dj.image = v; }); img.style.marginTop = '16px'; body.appendChild(img);
         var g2 = el('div', 'grid cols-2'); g2.style.marginTop = '16px';
-        var s1 = field('Instagram URL', dj.socials.instagram, { mono: true }); bind(s1._input, dj.socials, 'instagram');
-        var s2 = field('SoundCloud URL', dj.socials.soundcloud, { mono: true }); bind(s2._input, dj.socials, 'soundcloud');
-        g2.appendChild(s1); g2.appendChild(s2); body.appendChild(g2);
+        ['instagram', 'soundcloud', 'telegram', 'tiktok', 'youtube'].forEach(function (k) {
+          var sf = field(k.charAt(0).toUpperCase() + k.slice(1) + ' URL', dj.socials[k] || '', { mono: true });
+          bind(sf._input, dj.socials, k); g2.appendChild(sf);
+        });
+        body.appendChild(g2);
         list.appendChild(repeatItem(i, dj.name, dj.role, body, function () { C.djs.splice(i, 1); render(); setDirty(true); }));
       });
     }

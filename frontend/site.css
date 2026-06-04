@@ -237,8 +237,10 @@ button{ font-family: inherit; cursor: pointer; }
 
 .events{ display:grid; gap: 18px; }
 .event-card{ display:grid; grid-template-columns: 320px 1fr; gap: 0; border:1px solid var(--line);
-  background: var(--panel); overflow:hidden; transition: border-color .25s; }
+  background: var(--panel); overflow:hidden; transition: border-color .25s; position:relative; cursor:pointer; }
 .event-card:hover{ border-color: var(--red); }
+.event-card__link{ position:absolute; inset:0; z-index:2; }
+.archive-more{ margin-top: 32px; display:flex; justify-content:center; }
 .event-card__img{ background-size:cover; background-position:center; min-height: 230px;
   position:relative; filter: grayscale(.2) contrast(1.05); }
 .event-card__img::after{ content:""; position:absolute; inset:0;

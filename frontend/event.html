@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BARREL 23 — Event</title>
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="event.css">
+</head>
+<body class="ev-body">
+<div class="grain"></div>
+
+<!-- ================= TOP BAR ================= -->
+<header class="topbar scrolled" id="topbar">
+  <a class="topbar__brand" href="/">
+    <img data-logo alt="BARREL 23">
+    <img class="topbar__wordmark" data-wordmark alt="BARREL 23">
+  </a>
+  <a class="ev-back" href="/#archive">BACK TO ARCHIVE</a>
+</header>
+
+<main id="ev-main">
+  <!-- ================= TITLE ================= -->
+  <section class="ev-title" data-screen-label="Event title">
+    <div class="wrap">
+      <div class="ev-title__row">
+        <div>
+          <div class="kicker" id="ev-kicker">PAST TRANSMISSION</div>
+          <h1 class="display" id="ev-name"><em>—</em></h1>
+          <div class="ev-title__meta" id="ev-meta"></div>
+        </div>
+        <div class="ev-title__date" id="ev-date">—</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= LEAD: photo + description ================= -->
+  <section class="section ev-lead-sec" style="padding-top:0">
+    <div class="wrap ev-lead reveal" data-screen-label="Event lead">
+      <div class="ev-lead__img" id="ev-lead-img">
+        <div></div>
+        <span class="ev-lead__tag" id="ev-lead-tag">—</span>
+      </div>
+      <div class="ev-lead__copy">
+        <div class="kicker">THE NIGHT</div>
+        <p id="ev-desc"></p>
+        <div class="ev-facts" id="ev-facts"></div>
+        <div class="ev-lead__styles" id="ev-styles"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DJ LINEUP ================= -->
+  <section class="section" id="ev-lineup-sec" style="padding-top:0" data-screen-label="Event line-up">
+    <div class="wrap">
+      <div class="head-row reveal">
+        <div>
+          <div class="kicker">WHO PLAYED</div>
+          <h2 class="display">THE LINE-UP</h2>
+        </div>
+        <div class="count" id="ev-dj-count"></div>
+      </div>
+      <div class="ev-djs reveal" id="ev-djs"></div>
+    </div>
+  </section>
+
+  <!-- ================= GALLERY ================= -->
+  <section class="section" id="ev-gallery-sec" style="padding-top:0" data-screen-label="Event gallery">
+    <div class="wrap">
+      <div class="head-row reveal">
+        <div>
+          <div class="kicker">FROM THE FLOOR</div>
+          <h2 class="display">GALLERY</h2>
+        </div>
+        <div class="ev-gallery__count" id="ev-shot-count"></div>
+      </div>
+      <div class="ev-gallery reveal" id="ev-gallery"></div>
+    </div>
+  </section>
+</main>
+
+<!-- ================= NOT FOUND ================= -->
+<section class="section" id="ev-404" hidden>
+  <div class="wrap" style="text-align:center;padding:60px 0">
+    <div class="kicker" style="justify-content:center">SIGNAL LOST</div>
+    <h2 class="display" style="font-size:clamp(40px,7vw,90px);margin:14px 0 24px">EVENT NOT FOUND</h2>
+    <a class="btn btn--ghost" href="/#archive">BACK TO ARCHIVE</a>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer class="footer" data-screen-label="Footer">
+  <div class="wrap">
+    <div class="footer__top">
+      <div class="footer__brand">
+        <img data-logo alt="BARREL 23">
+        <img class="footer__wordmark" data-wordmark alt="BARREL 23">
+        <p>HARD TECHNO COLLECTIVE — UAE</p>
+      </div>
+      <div class="socials" id="footer-socials"></div>
+    </div>
+    <nav class="footer__nav" id="footer-nav"></nav>
+    <div class="footer__legal">
+      <span>© <span id="footer-year">2026</span> BARREL 23. ALL RIGHTS RESERVED.</span>
+      <span>BUILT FOR THE FLOOR. 👽 DESIGNED BY <a href="https://jahsus.space/" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;text-underline-offset:3px">JAHSUS</a></span>
+    </div>
+  </div>
+</footer>
+
+<!-- ================= LIGHTBOX ================= -->
+<div class="lightbox" id="lightbox" aria-hidden="true">
+  <button class="lightbox__close" id="lb-close" aria-label="Close">✕</button>
+  <button class="lightbox__nav lightbox__prev" id="lb-prev" aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button>
+  <img class="lightbox__img" id="lb-img" alt="">
+  <button class="lightbox__nav lightbox__next" id="lb-next" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></button>
+  <div class="lightbox__count" id="lb-count"></div>
+</div>
+
+<script src="event.js"></script>
+</body>
+</html>

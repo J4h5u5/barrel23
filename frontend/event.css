@@ -1,0 +1,136 @@
+/* ============================================================
+   BARREL 23 — EVENT PAGE
+   Single past-transmission detail view. Inherits the black+red
+   design system from site.css; this file adds page-specific blocks.
+   ============================================================ */
+
+/* keep the top bar legible immediately (no hero video behind it) */
+.ev-body{ padding-top: clamp(96px, 12vh, 140px); }
+
+/* back link in the top bar (replaces the hidden nav) */
+.ev-back{ display:inline-flex; align-items:center; gap:12px;
+  font-family: var(--mono); font-size: 12px; letter-spacing:.26em;
+  color: var(--ink-dim); text-transform:uppercase; }
+.ev-back::before{ content:"←"; color: var(--red); transition: transform .2s; }
+.ev-back:hover{ color: var(--ink); }
+.ev-back:hover::before{ transform: translateX(-4px); }
+
+/* ============================================================ TITLE */
+.ev-title{ padding: 0 var(--gut); }
+.ev-title__row{ display:flex; align-items:flex-end; justify-content:space-between;
+  gap: 24px; flex-wrap:wrap; border-bottom:1px solid var(--line);
+  padding-bottom: clamp(22px,3vw,38px); }
+.ev-title__meta{ display:flex; flex-wrap:wrap; gap: 10px 26px; align-items:center;
+  font-family: var(--mono); font-size: 13px; letter-spacing:.24em; color: var(--ink-dim);
+  margin-top: 22px; }
+.ev-title__meta b{ color: var(--ink); font-weight:700; }
+.ev-title__meta .dot{ width:5px; height:5px; border-radius:50%; background:var(--red);
+  display:inline-block; }
+.ev-title h1{ font-size: clamp(64px, 13vw, 200px); margin: 16px 0 0; }
+.ev-title h1 em{ font-style:normal; color: var(--red); }
+.ev-title__date{ font-family: var(--mono); font-size: clamp(13px,1.6vw,18px);
+  letter-spacing:.3em; color: var(--red); text-align:right; white-space:nowrap; }
+
+/* ============================================================ LEAD: photo + description */
+.ev-lead{ display:grid; grid-template-columns: 1.08fr .92fr;
+  gap: clamp(28px, 4.5vw, 70px); align-items:stretch;
+  padding-top: clamp(40px,6vw,80px); }
+.ev-lead__img{ position:relative; aspect-ratio: 4/5; overflow:hidden;
+  border:1px solid var(--line); background:#000; }
+.ev-lead__img > div{ position:absolute; inset:0; background-size:cover; background-position:center;
+  filter: grayscale(.18) contrast(1.06); }
+.ev-lead__img::after{ content:""; position:absolute; inset:0;
+  background: linear-gradient(180deg, transparent 55%, rgba(8,8,10,.55)); pointer-events:none; }
+.ev-lead__tag{ position:absolute; left:16px; bottom:16px; z-index:2;
+  font-family: var(--mono); font-size: 11px; letter-spacing:.26em; color:#fff;
+  background: var(--red); padding: 7px 11px; }
+
+.ev-lead__copy{ display:flex; flex-direction:column; }
+.ev-lead__copy .kicker{ margin-bottom: 20px; }
+.ev-lead__copy p{ font-size: clamp(18px,1.5vw,21px); line-height:1.7; color: var(--ink-dim);
+  margin: 0; max-width: 56ch; text-wrap: pretty; }
+.ev-facts{ display:grid; grid-template-columns: 1fr 1fr; gap:0;
+  margin-top: clamp(30px,4vw,48px); border-top:1px solid var(--line); }
+.ev-facts .fact{ padding: 16px 0; border-bottom:1px solid var(--line); }
+.ev-facts .fact:nth-child(odd){ padding-right: 20px; }
+.ev-facts .k{ font-family: var(--mono); font-size: 11px; letter-spacing:.28em; color: var(--ink-mute); }
+.ev-facts .v{ font-size: 19px; font-weight:600; margin-top: 5px; }
+.ev-lead__styles{ display:flex; flex-wrap:wrap; gap:8px; margin-top: auto; padding-top: 28px; }
+.ev-lead__styles span{ font-family: var(--mono); font-size: 11px; letter-spacing:.16em;
+  border:1px solid var(--line); color: var(--ink-dim); padding: 7px 11px; }
+
+/* ============================================================ DJ CONTAINERS */
+.ev-djs{ display:grid; grid-template-columns: repeat(auto-fill, minmax(230px,1fr));
+  gap: 16px; margin-top: clamp(30px,4vw,52px); }
+.ev-dj{ border:1px solid var(--line); background: var(--panel); overflow:hidden;
+  display:flex; flex-direction:column; transition: border-color .25s, transform .25s; }
+.ev-dj:hover{ border-color: var(--red); transform: translateY(-3px); }
+.ev-dj__img{ position:relative; aspect-ratio: 1/1; overflow:hidden; background:#000; }
+.ev-dj__img > div{ position:absolute; inset:0; background-size:cover; background-position:center;
+  filter: grayscale(.55) contrast(1.05); transition: filter .4s, transform .6s; }
+.ev-dj:hover .ev-dj__img > div{ filter: grayscale(0) contrast(1.05); transform: scale(1.05); }
+.ev-dj__img::after{ content:""; position:absolute; inset:0;
+  background: linear-gradient(180deg, transparent 60%, rgba(8,8,10,.4)); pointer-events:none; }
+.ev-dj__body{ padding: 16px 16px 18px; display:flex; flex-direction:column; gap: 4px; }
+.ev-dj__role{ font-family: var(--mono); font-size: 10px; letter-spacing:.3em; color: var(--red); }
+.ev-dj__name{ font-family: var(--display); font-size: clamp(24px,2.4vw,32px); line-height:1;
+  text-transform:uppercase; }
+.ev-dj__socials{ display:flex; gap: 9px; margin-top: 12px; }
+.ev-dj__socials a{ width:38px; height:38px; flex:none; display:grid; place-items:center;
+  border:1px solid var(--line); background: rgba(8,8,10,.6); color: var(--ink-dim);
+  transition: .2s; }
+.ev-dj__socials a:hover{ border-color: var(--red); color: var(--red); transform: translateY(-2px); }
+.ev-dj__socials svg{ width:16px; height:16px; }
+
+/* ============================================================ GALLERY (masonry) */
+.ev-gallery{ columns: 4; column-gap: 10px; margin-top: clamp(30px,4vw,52px); }
+.ev-shot{ break-inside: avoid; margin: 0 0 10px; width:100%; display:block;
+  border:1px solid var(--line); position:relative; overflow:hidden; cursor: zoom-in;
+  background:#000; }
+.ev-shot img{ width:100%; height:auto; display:block; filter: grayscale(.35) contrast(1.05);
+  transition: filter .35s, transform .6s; }
+.ev-shot:hover img{ filter: grayscale(0) contrast(1.05); transform: scale(1.04); }
+.ev-shot::after{ content:""; position:absolute; inset:0; border:1px solid transparent;
+  transition: border-color .2s; pointer-events:none; }
+.ev-shot:hover::after{ border-color: var(--red); }
+
+.ev-gallery__count{ font-family:var(--mono); font-size:12px; letter-spacing:.26em; color:var(--ink-mute); }
+
+/* ============================================================ LIGHTBOX */
+.lightbox{ position: fixed; inset:0; z-index: 80; background: rgba(5,5,7,.94);
+  backdrop-filter: blur(8px); display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition: opacity .25s; }
+.lightbox.open{ opacity:1; pointer-events:auto; }
+.lightbox__img{ max-width: 90vw; max-height: 84vh; object-fit:contain;
+  border:1px solid var(--line); box-shadow: 0 30px 90px rgba(0,0,0,.7); }
+.lightbox__close, .lightbox__nav{ position:absolute; background: rgba(13,13,16,.85);
+  border:1px solid var(--line); color: var(--ink); display:grid; place-items:center;
+  transition: .2s; }
+.lightbox__close{ top: clamp(16px,3vw,32px); right: clamp(16px,3vw,32px);
+  width:48px; height:48px; font-size:22px; }
+.lightbox__close:hover{ border-color: var(--red); color: var(--red); }
+.lightbox__nav{ top:50%; transform: translateY(-50%); width:54px; height:54px; }
+.lightbox__nav svg{ width:22px; height:22px; }
+.lightbox__nav:hover{ border-color: var(--red); color: var(--red); }
+.lightbox__prev{ left: clamp(12px,2vw,28px); }
+.lightbox__next{ right: clamp(12px,2vw,28px); }
+.lightbox__count{ position:absolute; bottom: clamp(16px,3vw,30px); left:50%;
+  transform: translateX(-50%); font-family: var(--mono); font-size:12px; letter-spacing:.26em;
+  color: var(--ink-dim); }
+.lightbox__count b{ color: var(--red); }
+
+/* ============================================================ RESPONSIVE */
+@media (max-width: 980px){
+  .ev-gallery{ columns: 3; }
+}
+@media (max-width: 900px){
+  .ev-lead{ grid-template-columns: 1fr; }
+  .ev-lead__img{ aspect-ratio: 4/3; }
+  .ev-title__date{ text-align:left; }
+}
+@media (max-width: 640px){
+  .ev-gallery{ columns: 2; column-gap: 8px; }
+  .ev-shot{ margin-bottom: 8px; }
+  .ev-facts{ grid-template-columns: 1fr; }
+  .lightbox__nav{ width:44px; height:44px; }
+}

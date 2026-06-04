@@ -157,18 +157,32 @@
     dotEls.forEach(function (d) { d.addEventListener('click', function () { clearInterval(ctimer); goSlide(+d.dataset.i); ctimer = setInterval(function () { goSlide(ci + 1); }, 4200); }); });
     if (slides.length > 1) ctimer = setInterval(function () { goSlide(ci + 1); }, 4200);
 
-    /* ===== PAST EVENTS ===== */
-    $('#ev-count').textContent = '[ ' + pad(C.pastEvents.length) + ' ARCHIVED ]';
-    $('#events').innerHTML = C.pastEvents.map(function (e) {
-      var lu = (e.lineup || []).map(function (n) { return '<b>' + esc(n) + '</b>'; }).join("");
+    /* ===== PAST EVENTS (show last 5, link to event page) ===== */
+    var ARCHIVE_LIMIT = 5;
+    var allEvents = C.pastEvents || [];
+    var shownEvents = allEvents.slice(0, ARCHIVE_LIMIT);
+    $('#ev-count').textContent = '[ ' + pad(allEvents.length) + ' ARCHIVED ]';
+    function eventUrl(e, idx) {
+      return 'event.html?' + (e.id ? 'id=' + encodeURIComponent(e.id) : 'i=' + idx);
+    }
+    $('#events').innerHTML = shownEvents.map(function (e, idx) {
+      var lu = (e.lineup || []).map(function (n) {
+        var name = typeof n === 'string' ? n : (n.name || '');
+        return '<b>' + esc(name) + '</b>';
+      }).join('');
+      var url = eventUrl(e, idx);
       return '<article class="event-card reveal">' +
+        '<a class="event-card__link" href="' + url + '" aria-label="' + esc(e.name) + '"></a>' +
         '<div class="event-card__img" data-bg="' + esc(e.image) + '"></div>' +
         '<div class="event-card__body">' +
-          '<div class="event-card__date">' + esc(e.date) + ' — ' + esc(e.city || '') + '</div>' +
-          '<h3 class="event-card__name">' + esc(e.name) + ' <span>// ' + esc(e.date.slice(0, 5)) + '</span></h3>' +
+          '<div class="event-card__date">' + esc(e.date) + (e.city ? ' — ' + esc(e.city) : '') + '</div>' +
+          '<h3 class="event-card__name">' + esc(e.name) + ' <span>// ' + esc((e.date || '').slice(0, 5)) + '</span></h3>' +
           '<div class="lineup">' + lu + '</div>' +
         '</div></article>';
-    }).join("");
+    }).join('') +
+    (allEvents.length > ARCHIVE_LIMIT
+      ? '<div class="archive-more reveal"><a class="btn btn--ghost" href="archive.html">SEE ALL ' + allEvents.length + ' EVENTS </a></div>'
+      : '');
 
     /* ===== DJs ===== */
     $('#djs').innerHTML = C.djs.map(function (dj) {
