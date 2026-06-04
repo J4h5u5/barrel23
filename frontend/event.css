@@ -89,8 +89,8 @@
   background:#000; }
 .ev-shot img{ width:100%; height:auto; display:block; filter: grayscale(.35) contrast(1.05);
   transition: filter .35s, transform .6s;
-  aspect-ratio: 4/3; object-fit: cover; }
-.ev-shot img.loaded{ aspect-ratio: unset; object-fit: unset; }
+  aspect-ratio: 4/3; object-fit: cover; contain: layout; }
+.ev-shot img.loaded{ aspect-ratio: unset; object-fit: unset; contain: unset; }
 .ev-shot:hover img{ filter: grayscale(0) contrast(1.05); transform: scale(1.04); }
 .ev-shot::after{ content:""; position:absolute; inset:0; border:1px solid transparent;
   transition: border-color .2s; pointer-events:none; }

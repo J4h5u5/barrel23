@@ -114,14 +114,27 @@
       var lb = $('#lightbox'), lbImg = $('#lb-img'), lbCount = $('#lb-count');
       var lbIndex = 0;
       function openLb(i) {
-        lbIndex = (i + gallery.length) % gallery.length;
+        lbIndex = ((i % gallery.length) + gallery.length) % gallery.length;
+        /* clear src first so browser doesn't flash previous image */
+        lbImg.removeAttribute('src');
         lbImg.src = gallery[lbIndex];
         lbCount.innerHTML = '<b>' + pad(lbIndex + 1) + '</b> / ' + pad(gallery.length);
         lb.classList.add('open'); lb.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
       }
       function closeLb() { lb.classList.remove('open'); lb.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
-      $('#ev-gallery').addEventListener('click', function (e) { var s = e.target.closest('.ev-shot'); if (s) openLb(+s.dataset.i); });
+      /* use mousedown index to avoid layout-shift between mousedown and click */
+      var pendingIndex = -1;
+      $('#ev-gallery').addEventListener('mousedown', function (e) {
+        var s = e.target.closest('.ev-shot');
+        pendingIndex = s ? +s.dataset.i : -1;
+      });
+      $('#ev-gallery').addEventListener('click', function (e) {
+        var s = e.target.closest('.ev-shot');
+        var idx = (pendingIndex >= 0) ? pendingIndex : (s ? +s.dataset.i : -1);
+        pendingIndex = -1;
+        if (idx >= 0) openLb(idx);
+      });
       $('#lb-close').addEventListener('click', closeLb);
       $('#lb-prev').addEventListener('click', function (e) { e.stopPropagation(); openLb(lbIndex - 1); });
       $('#lb-next').addEventListener('click', function (e) { e.stopPropagation(); openLb(lbIndex + 1); });
