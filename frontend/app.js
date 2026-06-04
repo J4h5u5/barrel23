@@ -373,10 +373,10 @@
   /* ===== Bootstrap: fetch content from API ===== */
   fetch('/api/content')
     .then(function (r) { return r.json(); })
-    .then(function (C) { init(C); })
+    .then(function (C) { init(C); document.body.classList.add('ready'); })
     .catch(function (err) {
       console.error('Failed to load content from API:', err);
-      // Show minimal error state
       document.body.innerHTML = '<div style="color:#fff;font-family:monospace;padding:2rem">Failed to load content. Make sure the API server is running.</div>';
+      document.body.classList.add('ready');
     });
 })();

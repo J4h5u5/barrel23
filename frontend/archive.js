@@ -69,5 +69,6 @@
       }, { rootMargin: '200px' });
       $$('.event-card').forEach(function (el) { io.observe(el); });
       $$('[data-bg]').forEach(function (el) { io.observe(el); });
+      document.body.classList.add('ready');
     });
 })();
