@@ -575,28 +575,77 @@
     }
     renderChips();
 
-    /* add row: pick from residents OR type new name */
-    var addRow = el('div', 'addrow'); addRow.style.flexWrap = 'wrap'; addRow.style.gap = '6px';
-    var djNames = (C.djs || []).map(function (d) { return d.name; }).filter(Boolean);
+    /* add row */
+    var addRow = el('div'); addRow.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:4px';
 
-    var nameInp = el('input'); nameInp.type = 'text'; nameInp.placeholder = 'Artist name…';
-    nameInp.style.cssText = 'flex:1;min-width:120px;font-family:var(--mono);font-size:13px';
+    /* custom DJ picker */
+    var pickerWrap = el('div'); pickerWrap.style.cssText = 'position:relative';
+    var pickerBtn = el('button');
+    pickerBtn.style.cssText = 'width:100%;display:flex;align-items:center;justify-content:space-between;background:#0a0a0a;border:1px solid #333;color:#888;padding:9px 12px;font-family:var(--mono);font-size:13px;text-align:left;cursor:pointer';
+    pickerBtn.innerHTML = '<span id="picker-label">Select from residents…</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
 
-    var roleInp = el('input'); roleInp.type = 'text'; roleInp.placeholder = 'Role (optional)';
-    roleInp.style.cssText = 'width:130px;font-family:var(--mono);font-size:13px';
+    var dropdown = el('div');
+    dropdown.style.cssText = 'position:absolute;top:100%;left:0;right:0;background:#111;border:1px solid #444;border-top:none;z-index:50;max-height:220px;overflow-y:auto;display:none';
 
-    /* datalist for autocomplete from residents */
-    var dlId = 'dj-dl-' + Math.random().toString(36).slice(2);
-    var dl = el('datalist'); dl.id = dlId;
-    djNames.forEach(function (n) { var o = el('option'); o.value = n; dl.appendChild(o); });
-    nameInp.setAttribute('list', dlId);
+    var djList = (C.djs || []);
+    var selectedDJ = null;
 
+    function buildDropdown() {
+      dropdown.innerHTML = '';
+      djList = (C.djs || []);
+      if (!djList.length) {
+        var empty = el('div'); empty.style.cssText = 'padding:12px;color:#555;font-family:var(--mono);font-size:12px';
+        empty.textContent = 'No residents yet'; dropdown.appendChild(empty); return;
+      }
+      djList.forEach(function (dj) {
+        var item = el('div');
+        item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid #222;transition:background .15s';
+        item.innerHTML =
+          (dj.image ? '<div style="width:32px;height:32px;border-radius:2px;background:#000 center/cover no-repeat;flex-shrink:0" style="background-image:url(' + esc(dj.image) + ')"></div>' :
+           '<div style="width:32px;height:32px;border-radius:2px;background:#222;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:14px">♪</div>') +
+          '<div><div style="font-family:var(--mono);font-size:13px;color:#fff">' + esc(dj.name) + '</div>' +
+          '<div style="font-family:var(--mono);font-size:10px;color:var(--red);letter-spacing:.2em">' + esc(dj.role || '') + '</div></div>';
+        if (dj.image) item.children[0].style.backgroundImage = 'url(' + esc(dj.image) + ')';
+        item.addEventListener('mouseenter', function () { item.style.background = '#1a1a1a'; });
+        item.addEventListener('mouseleave', function () { item.style.background = ''; });
+        item.addEventListener('click', function () {
+          selectedDJ = dj;
+          pickerBtn.querySelector('span').style.color = '#fff';
+          pickerBtn.querySelector('span').textContent = dj.name + (dj.role ? ' · ' + dj.role : '');
+          dropdown.style.display = 'none';
+        });
+        dropdown.appendChild(item);
+      });
+    }
+    buildDropdown();
+
+    pickerBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    });
+    document.addEventListener('click', function () { dropdown.style.display = 'none'; });
+    pickerWrap.appendChild(pickerBtn); pickerWrap.appendChild(dropdown);
+
+    /* manual name input */
+    var nameInp = el('input'); nameInp.type = 'text'; nameInp.placeholder = 'Or type artist name manually…';
+    nameInp.style.cssText = 'width:100%;box-sizing:border-box;background:#0a0a0a;border:1px solid #333;color:#fff;padding:9px 12px;font-family:var(--mono);font-size:13px;outline:none';
+
+    var roleInp = el('input'); roleInp.type = 'text'; roleInp.placeholder = 'Role (optional, e.g. HEADLINER)';
+    roleInp.style.cssText = 'width:100%;box-sizing:border-box;background:#0a0a0a;border:1px solid #333;color:#fff;padding:9px 12px;font-family:var(--mono);font-size:13px;outline:none';
+
+    var btnRow = el('div'); btnRow.style.cssText = 'display:flex;gap:8px';
     var addBtn = el('button', 'btn btn--sm', 'ADD');
+    addBtn.style.flex = '1';
+
     function doAdd() {
-      var name = nameInp.value.trim(); if (!name) return;
-      var role = roleInp.value.trim();
+      var name = (selectedDJ ? selectedDJ.name : nameInp.value.trim());
+      if (!name) return;
+      var role = roleInp.value.trim() || (selectedDJ ? (selectedDJ.role || '') : '');
       lineup.push(role ? { name: name, role: role } : name);
       nameInp.value = ''; roleInp.value = '';
+      selectedDJ = null;
+      pickerBtn.querySelector('span').textContent = 'Select from residents…';
+      pickerBtn.querySelector('span').style.color = '';
       renderChips(); setDirty(true);
     }
     addBtn.addEventListener('click', doAdd);
@@ -604,16 +653,18 @@
 
     /* new DJ button */
     var newDjBtn = el('button', 'btn btn--sm', '+ NEW DJ');
-    newDjBtn.style.marginLeft = 'auto';
     newDjBtn.addEventListener('click', function () { openNewDJModal(function (dj) {
       /* add to lineup automatically */
       lineup.push({ name: dj.name, role: dj.role || 'GUEST' });
-      /* refresh datalist */
-      var o = el('option'); o.value = dj.name; dl.appendChild(o);
+      buildDropdown();
       renderChips(); setDirty(true);
     }); });
 
-    addRow.appendChild(nameInp); addRow.appendChild(roleInp); addRow.appendChild(addBtn); addRow.appendChild(newDjBtn); addRow.appendChild(dl);
+    btnRow.appendChild(addBtn); btnRow.appendChild(newDjBtn);
+    addRow.appendChild(pickerWrap);
+    addRow.appendChild(nameInp);
+    addRow.appendChild(roleInp);
+    addRow.appendChild(btnRow);
     wrap.appendChild(chips); wrap.appendChild(addRow);
     return wrap;
   }
