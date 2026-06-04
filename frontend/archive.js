@@ -37,7 +37,8 @@
       var topbar = $('#topbar');
       window.addEventListener('scroll', function () { topbar.classList.toggle('scrolled', window.scrollY > 40); }, { passive: true });
 
-      var events = C.pastEvents || [];
+      function parseDate(s) { var p = (s || '').split('.'); return p.length === 3 ? new Date(+p[2], +p[1] - 1, +p[0]) : new Date(0); }
+      var events = (C.pastEvents || []).slice().sort(function (a, b) { return parseDate(b.date) - parseDate(a.date); });
       $('#ev-count').textContent = '[ ' + pad(events.length) + ' ARCHIVED ]';
 
       $('#events').innerHTML = events.map(function (e, idx) {

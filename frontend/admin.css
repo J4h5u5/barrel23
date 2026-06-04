@@ -97,6 +97,9 @@ img{ display:block; max-width:100%; }
 /* repeatable item */
 .item{ border:1px solid var(--line); border-radius:7px; background:var(--panel-2); margin-bottom:14px; overflow:hidden; }
 .item__bar{ display:flex; align-items:center; gap:12px; padding:13px 16px; background:var(--field); cursor:pointer; }
+.drag-handle{ font-size:16px; color:var(--ink-mute); cursor:grab; padding:0 6px 0 0; user-select:none; flex-shrink:0; }
+.drag-handle:active{ cursor:grabbing; }
+.item.drag-over{ border-color:var(--red); background:rgba(255,36,23,.05); }
 .item__bar .idx{ font-family:var(--mono); font-size:11px; color:var(--red); width:24px; }
 .item__bar .ttl{ font-size:14px; font-weight:600; flex:1; }
 .item__bar .sub{ font-family:var(--mono); font-size:11px; color:var(--ink-mute); }

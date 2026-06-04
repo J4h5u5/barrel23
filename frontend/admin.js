@@ -258,11 +258,12 @@
 
   function repeatItem(idx, title, sub, bodyEl, onDelete) {
     var item = el('div', 'item');
+    item.draggable = true;
     var bar = el('div', 'item__bar');
-    bar.innerHTML = '<span class="idx">' + (idx < 9 ? '0' : '') + (idx + 1) + '</span>' +
+    bar.innerHTML = '<span class="drag-handle" title="Drag to reorder">⠿</span><span class="idx">' + (idx < 9 ? '0' : '') + (idx + 1) + '</span>' +
       '<span class="ttl">' + title + '</span><span class="sub">' + (sub || '') + '</span>' +
       '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
-    bar.addEventListener('click', function () { item.classList.toggle('open'); });
+    bar.addEventListener('click', function (e) { if (!e.target.classList.contains('drag-handle')) item.classList.toggle('open'); });
     var body = el('div', 'item__body');
     body.appendChild(bodyEl);
     var foot = el('div', 'item__foot');
@@ -791,6 +792,36 @@
     return String(str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || ('ev-' + Date.now());
   }
 
+  function parseDateStr(s) { var p = (s || '').split('.'); return p.length === 3 ? new Date(+p[2], +p[1] - 1, +p[0]) : new Date(0); }
+
+  function makeSortable(listEl, arr, onReorder) {
+    var dragged = null;
+    listEl.addEventListener('dragstart', function (e) {
+      dragged = e.target.closest('.item');
+      if (dragged) { setTimeout(function () { dragged.style.opacity = '.4'; }, 0); }
+    });
+    listEl.addEventListener('dragend', function () {
+      if (dragged) { dragged.style.opacity = ''; dragged = null; }
+      listEl.querySelectorAll('.item').forEach(function (el) { el.classList.remove('drag-over'); });
+    });
+    listEl.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      var target = e.target.closest('.item');
+      if (!target || target === dragged) return;
+      listEl.querySelectorAll('.item').forEach(function (el) { el.classList.remove('drag-over'); });
+      target.classList.add('drag-over');
+      var items = Array.prototype.slice.call(listEl.querySelectorAll('.item'));
+      var fromIdx = items.indexOf(dragged);
+      var toIdx = items.indexOf(target);
+      if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+      var moved = arr.splice(fromIdx, 1)[0];
+      arr.splice(toIdx, 0, moved);
+      if (fromIdx < toIdx) listEl.insertBefore(dragged, target.nextSibling);
+      else listEl.insertBefore(dragged, target);
+      setDirty(true);
+    });
+  }
+
   panels.events = function (root) {
     var card = el('div', 'card');
     card.innerHTML = '<div class="kick">BLOCK 03 · ARCHIVE</div><div class="card__head"><div><h2>Past Events</h2><p>Last 5 events are shown on the main page. All events are accessible via /archive.html.</p></div></div>';
@@ -844,13 +875,23 @@
       });
     }
     render();
+    makeSortable(list, C.pastEvents, render);
+
+    var toolbar = el('div'); toolbar.style.cssText = 'display:flex;gap:8px;margin-bottom:12px';
+    var sortBtn = el('button', 'btn btn--sm btn--ghost', '↓ SORT BY DATE');
+    sortBtn.addEventListener('click', function () {
+      C.pastEvents.sort(function (a, b) { return parseDateStr(b.date) - parseDateStr(a.date); });
+      render(); setDirty(true); toast('SORTED BY DATE');
+    });
+    toolbar.appendChild(sortBtn);
+
     var add = el('button', 'btn btn--full', '+ ADD PAST EVENT');
     add.addEventListener('click', function () {
       var ev = { id: '', name: 'COVEN', date: '', city: 'DUBAI', venue: '', doors: '', description: '', image: '', lineup: [], gallery: [] };
       ev.id = slugify(ev.name + '-' + Date.now());
       C.pastEvents.push(ev); render(); setDirty(true);
     });
-    card.appendChild(list); card.appendChild(add);
+    card.appendChild(toolbar); card.appendChild(list); card.appendChild(add);
     root.appendChild(card);
   };
 
