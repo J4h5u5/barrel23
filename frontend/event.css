@@ -104,7 +104,9 @@
   opacity:0; pointer-events:none; transition: opacity .25s; }
 .lightbox.open{ opacity:1; pointer-events:auto; }
 .lightbox__img{ max-width: 90vw; max-height: 84vh; object-fit:contain;
-  border:1px solid var(--line); box-shadow: 0 30px 90px rgba(0,0,0,.7); }
+  border:1px solid var(--line); box-shadow: 0 30px 90px rgba(0,0,0,.7);
+  transition: opacity .15s; }
+.lightbox__img.loading{ opacity: 0; }
 .lightbox__close, .lightbox__nav{ position:absolute; background: rgba(13,13,16,.85);
   border:1px solid var(--line); color: var(--ink); display:grid; place-items:center;
   transition: .2s; }

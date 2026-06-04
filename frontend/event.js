@@ -125,8 +125,11 @@
 
       function openLb(i) {
         lbIndex = ((i % gallery.length) + gallery.length) % gallery.length;
-        lbImg.removeAttribute('src');
-        lbImg.src = galUrl(gallery[lbIndex]);
+        var url = galUrl(gallery[lbIndex]);
+        lbImg.classList.add('loading');
+        lbImg.onload = function () { lbImg.classList.remove('loading'); };
+        lbImg.onerror = function () { lbImg.classList.remove('loading'); };
+        lbImg.src = url;
         lbCount.innerHTML = '<b>' + pad(lbIndex + 1) + '</b> / ' + pad(gallery.length);
         lb.classList.add('open'); lb.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
