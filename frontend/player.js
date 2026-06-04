@@ -4,9 +4,7 @@
    from localStorage, auto-resumes if was playing before navigation.
    ============================================================ */
 (function () {
-  var $ = function (s, r) { return (r || document).querySelector(s); };
-  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
-  var esc = function (t) { return (t == null ? '' : String(t)).replace(/[&<>]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]; }); };
+  var $ = B23.$, $$ = B23.$$, esc = B23.esc, pad = B23.pad;
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
   var playerEl = $('#player');
@@ -205,19 +203,19 @@
   if (listBtn) listBtn.addEventListener('click', function (e) { e.stopPropagation(); tl.classList.toggle('open'); });
   document.addEventListener('click', function (e) { if (tl && !tl.contains(e.target) && e.target !== listBtn) tl.classList.remove('open'); });
 
-  /* ===== INIT: fetch sets, restore state, auto-resume ===== */
-  fetch('/api/content')
-    .then(function (r) { return r.json(); })
-    .then(function (C) {
-      sets = C.sets || [];
-      if (!sets.length) { playerEl.classList.add('hidden'); return; }
-      if (P.i >= sets.length) P.i = 0;
-      renderMeta();
-      playerEl.classList.remove('hidden');
+  /* ===== INIT: use cached content if available (avoids double fetch on index), else fetch ===== */
+  function initPlayer(C) {
+    sets = C.sets || [];
+    if (!sets.length) { playerEl.classList.add('hidden'); return; }
+    if (P.i >= sets.length) P.i = 0;
+    renderMeta();
+    playerEl.classList.remove('hidden');
+    if (P.playing && P.t > 0) setTimeout(function () { setPlaying(true); }, 300);
+  }
 
-      /* auto-resume if was playing before navigation */
-      if (P.playing && P.t > 0) {
-        setTimeout(function () { setPlaying(true); }, 300);
-      }
-    });
+  if (window.__B23_CONTENT) {
+    initPlayer(window.__B23_CONTENT);
+  } else {
+    fetch('/api/content').then(function (r) { return r.json(); }).then(initPlayer);
+  }
 })();
