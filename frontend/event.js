@@ -103,6 +103,11 @@
           return '<button class="ev-shot" data-i="' + i + '" aria-label="Open photo ' + (i + 1) + '">' +
             '<img src="' + esc(src) + '" alt="' + esc(ev.name) + ' frame ' + (i + 1) + '" loading="lazy"></button>';
         }).join('');
+        /* remove placeholder aspect-ratio once each image loads */
+        $$('img', $('#ev-gallery')).forEach(function (img) {
+          if (img.complete) { img.classList.add('loaded'); }
+          else { img.addEventListener('load', function () { img.classList.add('loaded'); }); }
+        });
       }
 
       /* lightbox */
