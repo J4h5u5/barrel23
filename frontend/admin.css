@@ -104,7 +104,7 @@ img{ display:block; max-width:100%; }
 .item.open .item__bar .chev{ transform:rotate(180deg); }
 .item__body{ display:none; padding:20px 16px; }
 .item.open .item__body{ display:block; }
-.item__foot{ display:flex; justify-content:flex-end; margin-top:14px; }
+.item__foot{ display:flex; justify-content:flex-end; gap:12px; margin-top:14px; }
 
 .chips{ display:flex; flex-wrap:wrap; gap:8px; }
 .chip{ display:inline-flex; align-items:center; gap:8px; background:var(--field); border:1px solid var(--line);
