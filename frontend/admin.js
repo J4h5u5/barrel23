@@ -292,7 +292,7 @@
     [
       [C.hero.eventName, 'NEXT EVENT', true],
       [C.pastEvents.length, 'PAST EVENTS', false],
-      [C.djs.length, 'RESIDENTS', false],
+      [C.djs.length, 'RESIDENTS & ARTISTS', false],
       [C.sets.length, 'AUDIO SETS', false]
     ].forEach(function (s) {
       var st = el('div', 'stat', '<div class="n' + (s[2] ? ' red' : '') + '" style="font-size:' + (s[2] ? '30px' : '42px') + '">' + s[0] + '</div><div class="l">' + s[1] + '</div>');
@@ -582,7 +582,7 @@
     var pickerWrap = el('div'); pickerWrap.style.cssText = 'position:relative';
     var pickerBtn = el('button');
     pickerBtn.style.cssText = 'width:100%;display:flex;align-items:center;justify-content:space-between;background:#0a0a0a;border:1px solid #333;color:#888;padding:9px 12px;font-family:var(--mono);font-size:13px;text-align:left;cursor:pointer';
-    pickerBtn.innerHTML = '<span id="picker-label">Select from residents…</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+    pickerBtn.innerHTML = '<span id="picker-label">Select from residents & artists…</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
 
     var dropdown = el('div');
     dropdown.style.cssText = 'position:absolute;top:100%;left:0;right:0;background:#111;border:1px solid #444;border-top:none;z-index:50;max-height:220px;overflow-y:auto;display:none';
@@ -595,7 +595,7 @@
       djList = (C.djs || []);
       if (!djList.length) {
         var empty = el('div'); empty.style.cssText = 'padding:12px;color:#555;font-family:var(--mono);font-size:12px';
-        empty.textContent = 'No residents yet'; dropdown.appendChild(empty); return;
+        empty.textContent = 'No residents & artists yet'; dropdown.appendChild(empty); return;
       }
       djList.forEach(function (dj) {
         var item = el('div');
@@ -644,7 +644,7 @@
       lineup.push(role ? { name: name, role: role } : name);
       nameInp.value = ''; roleInp.value = '';
       selectedDJ = null;
-      pickerBtn.querySelector('span').textContent = 'Select from residents…';
+      pickerBtn.querySelector('span').textContent = 'Select from residents & artists…';
       pickerBtn.querySelector('span').style.color = '';
       renderChips(); setDirty(true);
     }
@@ -856,7 +856,7 @@
 
   panels.djs = function (root) {
     var card = el('div', 'card');
-    card.innerHTML = '<div class="kick">BLOCK 03 · THE CIRCLE</div><div class="card__head"><div><h2>Residents</h2></div></div>';
+    card.innerHTML = '<div class="kick">BLOCK 03 · THE CIRCLE</div><div class="card__head"><div><h2>Residents & Artists</h2></div></div>';
     var list = el('div');
     function render() {
       list.innerHTML = '';
@@ -1140,7 +1140,7 @@
   var titles = {
     dashboard: ['Dashboard', 'OVERVIEW'], hero: ['Hero & Countdown', 'BLOCK 01'],
     announce: ['Next Event', 'BLOCK 02'], events: ['Past Events', 'BLOCK 03'],
-    djs: ['Residents', 'BLOCK 03'], sets: ['Audio Sets', 'PLAYER'],
+    djs: ['Residents & Artists', 'BLOCK 03'], sets: ['Audio Sets', 'PLAYER'],
     about: ['About', 'BLOCK 04'], settings: ['Contacts & Settings', 'FOOTER'],
     media: ['Media Library', 'UPLOADS']
   };
