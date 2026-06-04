@@ -117,6 +117,26 @@
   <div class="lightbox__count" id="lb-count"></div>
 </div>
 
+<!-- ================= MEDIA PLAYER ================= -->
+<div class="tracklist" id="tracklist"></div>
+<div class="player hidden" id="player">
+  <button class="player__nav" id="pl-prev" aria-label="Previous"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h2v14H7zM20 5v14l-9-7z"/></svg></button>
+  <button class="player__btn" id="pl-play" aria-label="Play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg></button>
+  <button class="player__nav" id="pl-next" aria-label="Next"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 5h2v14h-2zM4 5l9 7-9 7z"/></svg></button>
+  <div class="player__eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div class="player__meta">
+    <div class="player__title" id="pl-title">—</div>
+    <div class="player__sub" id="pl-sub">—</div>
+  </div>
+  <div class="player__bar">
+    <span class="player__time start" id="pl-cur">0:00</span>
+    <div class="seek" id="seek"><div class="seek__fill" id="seek-fill"></div><div class="seek__head" id="seek-head"></div></div>
+    <span class="player__time end" id="pl-end">0:00</span>
+  </div>
+  <button class="player__list-btn" id="pl-list">SETS</button>
+</div>
+
 <script src="event.js"></script>
+<script src="player.js"></script>
 </body>
 </html>
