@@ -386,6 +386,7 @@ button{ font-family: inherit; cursor: pointer; }
   .event-card{ grid-template-columns: 1fr; }
   .event-card__img{ min-height: 190px; }
   .about__cols{ grid-template-columns: 1fr; }
+  .sound{ margin-top: 0; }
   .cd-sep{ display:none; }
   .countdown{ gap: 4px; width:100%; justify-content: space-between; }
   .cd-unit{ min-width:0; flex:1; }
@@ -398,6 +399,26 @@ button{ font-family: inherit; cursor: pointer; }
   .player__meta{ width: 96px; }
   .hero__meta{ font-size:11px; gap:8px 16px; }
   .rm-toggle{ bottom: 84px; }
+
+  /* ── DJ cards: bigger on mobile ── */
+  .dj__role{ font-size: 12px; letter-spacing:.25em; }
+  .dj__name{ font-size: 34px; }
+  .dj__socials a{ width: 40px; height: 40px; }
+  .dj__socials svg{ width: 18px; height: 18px; }
+  .dj__info{ left:16px; right:16px; bottom:16px; }
+
+  /* ── countdown: bigger digits ── */
+  .cd-num{ font-size: clamp(38px, 12vw, 56px); }
+
+  /* ── event cards: tighter ── */
+  .event-card__name{ font-size: clamp(30px,9vw,52px); }
+  .lineup b{ font-size: 11px; padding: 5px 9px; }
+
+  /* ── announce facts: 2 columns ── */
+  .announce__facts{ grid-template-columns: 1fr 1fr; }
+
+  /* ── footer: smaller ── */
+  .footer__nav{ flex-wrap: wrap; gap: 10px 20px; }
 }
 
 @media (hover: none){

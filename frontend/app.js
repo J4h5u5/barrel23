@@ -202,8 +202,9 @@
 
     /* ===== PARALLAX ===== */
     var pEls = $$('[data-parallax]'), rmOn = false;
+    var isMobile = window.matchMedia('(max-width: 900px)').matches;
     function parallax() {
-      if (rmOn) return;
+      if (rmOn || isMobile) return;
       var y = window.scrollY;
       pEls.forEach(function (el) { el.style.transform = 'translate3d(0,' + (y * parseFloat(el.dataset.parallax)) + 'px,0)'; });
     }
