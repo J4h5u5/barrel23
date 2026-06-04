@@ -935,6 +935,7 @@
       });
     }
     render();
+    makeSortable(list, C.djs, render);
     var add = el('button', 'btn btn--full', '+ ADD RESIDENT');
     add.addEventListener('click', function () { C.djs.push({ name: 'NEW DJ', role: 'RESIDENT', image: '', socials: { instagram: '#', soundcloud: '#' } }); render(); setDirty(true); });
     card.appendChild(list); card.appendChild(add);
