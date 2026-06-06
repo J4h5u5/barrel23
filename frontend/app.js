@@ -142,6 +142,7 @@
 
     /* ===== PAST EVENTS (show last 5, link to event page) ===== */
     var ARCHIVE_LIMIT = 5;
+    function parseDate(s) { var p = (s || '').split('.'); return p.length === 3 ? new Date(+p[2], +p[1] - 1, +p[0]) : new Date(0); }
     var allEvents = (C.pastEvents || []).slice().sort(function (a, b) { return parseDate(b.date) - parseDate(a.date); });
     var shownEvents = allEvents.slice(0, ARCHIVE_LIMIT);
     $('#ev-count').textContent = '[ ' + pad(allEvents.length) + ' ARCHIVED ]';

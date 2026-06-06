@@ -4,7 +4,9 @@
    from localStorage, auto-resumes if was playing before navigation.
    ============================================================ */
 (function () {
-  var $ = B23.$, $$ = B23.$$, esc = B23.esc, pad = B23.pad;
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var esc = function (t) { return (t == null ? '' : String(t)).replace(/[&<>]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]; }); };
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
   var playerEl = $('#player');
