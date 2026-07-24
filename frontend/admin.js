@@ -1259,7 +1259,7 @@
     announce: ['Next Event', 'BLOCK 02'], events: ['Past Events', 'BLOCK 03'],
     djs: ['Residents & Artists', 'BLOCK 03'], sets: ['Audio Sets', 'PLAYER'],
     about: ['About', 'BLOCK 04'], settings: ['Contacts & Settings', 'FOOTER'],
-    media: ['Media Library', 'UPLOADS']
+    media: ['Media Library', 'UPLOADS'], mail: ['Mailbox', 'EMAIL']
   };
 
   function route(name) {
@@ -1267,12 +1267,18 @@
     $$('.navlink').forEach(function (a) { a.classList.toggle('active', a.dataset.go === name); });
     $('#page-title').textContent = titles[name][0];
     $('#page-crumb').textContent = 'BARREL 23 / ' + titles[name][1];
-    var root = $('#content'); root.innerHTML = '';
+    var root = $('#content');
+    root.classList.toggle('content--mail', name === 'mail');
+    root.innerHTML = '';
     var panel = el('div', 'panel active'); root.appendChild(panel);
     panels[name](panel);
   }
 
   $$('.navlink').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); route(a.dataset.go); }); });
+
+  if (typeof window.BARREL_registerMailPanel === 'function') {
+    panels.mail = window.BARREL_registerMailPanel({ el: el, toast: toast, apiFetch: apiFetch });
+  }
 
   /* Save */
   $('#btn-save').addEventListener('click', function () {

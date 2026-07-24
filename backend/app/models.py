@@ -31,3 +31,21 @@ class Admin(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(100), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
+
+
+class MailAccount(Base):
+    """Connection metadata for an extra mailbox managed through the admin."""
+
+    __tablename__ = "mail_accounts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    display_name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=False, unique=True)
+    imap_host = Column(String(255), nullable=False)
+    imap_port = Column(Integer, nullable=False)
+    imap_security = Column(String(32), nullable=False, default="ssl_tls")
+    smtp_host = Column(String(255), nullable=False)
+    smtp_port = Column(Integer, nullable=False)
+    smtp_security = Column(String(32), nullable=False, default="ssl_tls")
+    password_ciphertext = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

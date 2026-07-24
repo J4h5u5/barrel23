@@ -6,7 +6,7 @@ from pathlib import Path
 from .config import settings
 from .database import engine
 from . import models
-from .routers import auth, content, media
+from .routers import auth, content, mail, media
 from .seed import seed_admin
 
 models.Base.metadata.create_all(bind=engine)
@@ -28,6 +28,7 @@ def on_startup():
 app.include_router(auth.router)
 app.include_router(content.router)
 app.include_router(media.router)
+app.include_router(mail.router)
 
 @app.get("/admin")
 def admin_redirect():
