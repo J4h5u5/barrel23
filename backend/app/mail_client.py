@@ -329,32 +329,81 @@ def _unquote_line(line: str) -> str:
     return re.sub(r"^\s*(?:>\s*)+", "", line).rstrip()
 
 
-def _quoted_author(line: str) -> dict | None:
-    """Parse the common `On ..., Name <email> wrote:` reply separator."""
-    line = _unquote_line(line).strip()
-    match = re.match(r"^(?:[-–—]{2,}\s*)?On\s+(.+?)\s+wrote:\s*$", line, flags=re.IGNORECASE)
-    if not match:
-        return None
-    details = match.group(1)
-    if ", " in details:
-        date_label, sender_text = details.rsplit(", ", 1)
-    else:
-        date_label, sender_text = "", details
-    name, email = parseaddr(sender_text)
+def _quote_metadata(date_label: str, sender_text: str) -> dict:
+    name, email = parseaddr(sender_text.strip().rstrip(":"))
     return {
-        "name": _decode_header(name) or sender_text.strip() or "Previous sender",
+        "name": _decode_header(name) or sender_text.strip().rstrip(":") or "Previous sender",
         "email": email,
         "date": _message_date(date_label),
-        "date_label": date_label,
+        "date_label": date_label.strip(" ,"),
     }
+
+
+def _split_date_and_sender(details: str) -> tuple[str, str]:
+    """Separate a quoted date from the author, including `13:55 CEST Name`."""
+    email_match = re.search(r"<[^<>\s]+@[^<>\s]+>\s*$", details)
+    before_email = details[:email_match.start()].strip() if email_match else details.strip()
+    email_suffix = details[email_match.start():].strip() if email_match else ""
+    times = list(
+        re.finditer(
+            r"(?:\b(?:at|om|в)\s*)?\d{1,2}:\d{2}(?:\s?(?:AM|PM))?(?:\s+[A-Z]{2,5})?",
+            before_email,
+            flags=re.IGNORECASE,
+        )
+    )
+    if times:
+        boundary = times[-1].end()
+        sender = before_email[boundary:].strip(" ,")
+        if sender:
+            return before_email[:boundary].strip(" ,"), (sender + " " + email_suffix).strip()
+    if ", " in before_email:
+        date_label, sender = before_email.rsplit(", ", 1)
+        return date_label, (sender + " " + email_suffix).strip()
+    return "", details
+
+
+def _quoted_author(line: str) -> dict | None:
+    """Parse common Gmail reply separators across common locale variants."""
+    line = _unquote_line(line).strip()
+    line = re.sub(r"^(?:[-–—]{2,}\s*)", "", line)
+    english = re.match(r"^On\s+(.+?)\s+wrote:\s*$", line, flags=re.IGNORECASE)
+    if english:
+        date_label, sender_text = _split_date_and_sender(english.group(1))
+        return _quote_metadata(date_label, sender_text)
+
+    # Dutch, German, Swedish and Russian Gmail formats put the author after a verb.
+    localized = [
+        r"^Op\s+(?P<date>.+?)\s+schreef\s+(?P<sender>.+?):\s*$",
+        r"^Am\s+(?P<date>.+?)\s+schrieb\s+(?P<sender>.+?):\s*$",
+        r"^Den\s+(?P<date>.+?)\s+skrev\s+(?P<sender>.+?):\s*$",
+        r"^В\s+(?P<date>.+?)\s+писал(?:а)?\s+(?P<sender>.+?):\s*$",
+    ]
+    for pattern in localized:
+        match = re.match(pattern, line, flags=re.IGNORECASE)
+        if match:
+            return _quote_metadata(match.group("date"), match.group("sender"))
+
+    # Russian Gmail and some mobile clients use only `date, sender <email>:`.
+    generic = re.match(
+        r"^(?P<date>.+?\d{1,2}:\d{2}[^,]*),\s*(?P<sender>.+<[^<>\s]+@[^<>\s]+>)\s*:\s*$",
+        line,
+        flags=re.IGNORECASE,
+    )
+    if generic:
+        return _quote_metadata(generic.group("date"), generic.group("sender"))
+    return None
 
 
 def _outlook_quote(lines: list[str], start: int) -> tuple[dict, int] | None:
     """Parse an Outlook-style quoted header block before its message text."""
     first = _unquote_line(lines[start]).strip()
-    if not first.lower().startswith("from:"):
+    if not re.match(r"^(from|от)\s*:", first, flags=re.IGNORECASE):
         return None
     fields: dict[str, str] = {}
+    aliases = {
+        "from": "from", "от": "from", "sent": "sent", "отправлено": "sent",
+        "date": "date", "дата": "date", "to": "to", "кому": "to", "subject": "subject", "тема": "subject",
+    }
     end = start
     for index in range(start, min(len(lines), start + 8)):
         line = _unquote_line(lines[index]).strip()
@@ -362,9 +411,10 @@ def _outlook_quote(lines: list[str], start: int) -> tuple[dict, int] | None:
             end = index + 1
             break
         key, separator, value = line.partition(":")
-        if not separator or key.lower() not in {"from", "sent", "date", "to", "subject"}:
+        normalized_key = aliases.get(key.strip().lower())
+        if not separator or not normalized_key:
             break
-        fields[key.lower()] = value.strip()
+        fields[normalized_key] = value.strip()
         end = index + 1
     if "from" not in fields or not ({"sent", "date"} & fields.keys()):
         return None
