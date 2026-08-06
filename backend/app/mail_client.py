@@ -369,6 +369,8 @@ def _unquote_line(line: str) -> str:
 
 def _quote_metadata(date_label: str, sender_text: str) -> dict:
     name, email = parseaddr(sender_text.strip().rstrip(":"))
+    if "@" not in email:
+        email = ""
     return {
         "name": _decode_header(name) or email or sender_text.strip().rstrip(":") or "Previous sender",
         "email": email,
@@ -424,6 +426,14 @@ def _quoted_author(line: str) -> dict | None:
     )
     if spanish_author_only:
         return _quote_metadata("", spanish_author_only.group("sender"))
+
+    french = re.match(
+        r"^Le\s+(?P<date>.+?)\s+à\s+(?P<time>\d{1,2}:\d{2}),\s*(?P<sender>.+?)\s+a écrit\s*:\s*$",
+        line,
+        flags=re.IGNORECASE,
+    )
+    if french:
+        return _quote_metadata(french.group("date") + " à " + french.group("time"), french.group("sender"))
 
     # Dutch, German, Swedish and Russian Gmail formats put the author after a verb.
     localized = [
