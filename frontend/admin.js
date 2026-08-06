@@ -8,6 +8,7 @@
   var esc = function (t) { return (t == null ? '' : String(t)).replace(/[&<>]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]; }); };
 
   var TOKEN_KEY = 'barrel23_admin_token';
+  var SIDEBAR_KEY = 'barrel23_admin_sidebar_collapsed';
   var C = null;
   var dirty = false;
   var authRedirecting = false;
@@ -18,6 +19,20 @@
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
   function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
   function clearToken() { localStorage.removeItem(TOKEN_KEY); }
+
+  function setSidebarCollapsed(collapsed) {
+    var layout = $('.layout');
+    var button = $('#btn-sidebar');
+    if (!layout || !button) return;
+    layout.classList.toggle('sidebar-collapsed', collapsed);
+    button.setAttribute('aria-pressed', String(collapsed));
+    button.title = collapsed ? 'Expand menu' : 'Collapse menu';
+    $('.sidebar-toggle__label', button).textContent = collapsed ? 'SHOW MENU' : 'HIDE MENU';
+    $$('.navlink').forEach(function (link) {
+      if (!link.title) link.title = link.textContent.trim();
+    });
+    localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
+  }
 
   function apiFetch(path, opts) {
     opts = opts || {};
@@ -1261,6 +1276,11 @@
   /* ============================================================
      ROUTER
      ============================================================ */
+  setSidebarCollapsed(localStorage.getItem(SIDEBAR_KEY) === '1');
+  $('#btn-sidebar').addEventListener('click', function () {
+    setSidebarCollapsed(!$('.layout').classList.contains('sidebar-collapsed'));
+  });
+
   var current = 'dashboard';
   var titles = {
     dashboard: ['Dashboard', 'OVERVIEW'], hero: ['Hero & Countdown', 'BLOCK 01'],

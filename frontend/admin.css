@@ -17,11 +17,11 @@ button{ font-family:inherit; cursor:pointer; }
 img{ display:block; max-width:100%; }
 ::-webkit-scrollbar{ width:10px; height:10px; } ::-webkit-scrollbar-thumb{ background:var(--line-2); }
 
-.layout{ display:grid; grid-template-columns:266px 1fr; min-height:100vh; }
+.layout{ display:grid; grid-template-columns:266px 1fr; min-height:100vh; transition:grid-template-columns .2s ease; }
 
 /* ---------- sidebar ---------- */
 .side{ background:var(--black); border-right:1px solid var(--line); display:flex; flex-direction:column;
-  position:sticky; top:0; height:100vh; }
+  position:sticky; top:0; height:100vh; overflow:hidden; }
 .side__brand{ display:flex; align-items:center; gap:11px; padding:20px 22px; border-bottom:1px solid var(--line); }
 .side__brand img{ height:34px; }
 .side__brand b{ font-family:var(--display); font-size:19px; letter-spacing:.04em; }
@@ -42,12 +42,33 @@ img{ display:block; max-width:100%; }
 .topbar{ position:sticky; top:0; z-index:20; background:rgba(11,11,13,.9); backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;
   padding:16px 32px; gap:16px; }
+.topbar__title{ display:flex; align-items:center; gap:14px; min-width:0; }
 .topbar h1{ font-family:var(--display); font-size:26px; margin:0; letter-spacing:.02em; }
 .topbar .crumb{ font-family:var(--mono); font-size:11px; letter-spacing:.2em; color:var(--ink-mute); }
 .topbar__actions{ display:flex; align-items:center; gap:12px; }
 .savestate{ font-family:var(--mono); font-size:11px; letter-spacing:.16em; color:var(--ink-mute); }
 .savestate.dirty{ color:var(--red); }
 .savestate.saved{ color:var(--green); }
+.sidebar-toggle{ height:36px; display:inline-flex; align-items:center; gap:8px; padding:0 10px; background:transparent;
+  border:1px solid var(--line); border-radius:5px; color:var(--ink-dim); cursor:pointer; font-family:var(--mono); font-size:10px; letter-spacing:.14em; white-space:nowrap; }
+.sidebar-toggle:hover{ border-color:var(--red); color:var(--ink); }
+.sidebar-toggle svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; }
+.sidebar-toggle__arrow{ transition:transform .2s ease; }
+
+/* Desktop compact sidebar keeps navigation accessible through icons and titles. */
+@media (min-width:881px){
+  .layout.sidebar-collapsed{ grid-template-columns:74px 1fr; }
+  .layout.sidebar-collapsed .side__brand{ justify-content:center; padding:20px 0; }
+  .layout.sidebar-collapsed .side__brand div,
+  .layout.sidebar-collapsed .side__group,
+  .layout.sidebar-collapsed .side__foot{ display:none; }
+  .layout.sidebar-collapsed .side__nav{ padding:14px 10px; }
+  .layout.sidebar-collapsed .navlink{ justify-content:center; gap:0; padding:12px 0; font-size:0; }
+  .layout.sidebar-collapsed .navlink .ic{ width:18px; height:18px; }
+  .layout.sidebar-collapsed .sidebar-toggle__label{ display:none; }
+  .layout.sidebar-collapsed .sidebar-toggle{ padding:0 9px; }
+  .layout.sidebar-collapsed .sidebar-toggle__arrow{ transform:rotate(180deg); }
+}
 
 .content{ padding:32px; max-width:1100px; width:100%; }
 .panel{ display:none; }
@@ -176,4 +197,5 @@ img{ display:block; max-width:100%; }
   .grid.cols-2, .grid.cols-3{ grid-template-columns:1fr; }
   .content{ padding:20px; }
   .topbar{ padding:14px 20px; }
+  .sidebar-toggle{ display:none; }
 }
