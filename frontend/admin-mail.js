@@ -7,7 +7,7 @@ window.BARREL_registerMailPanel = function (api) {
   var savedListWidth = Number(localStorage.getItem('barrel23_mail_list_width'));
   var state = {
     accounts: [], accountId: null, folders: [], folder: 'INBOX', messages: [], selected: null,
-    loading: false, error: '', messageCache: {}, listWidth: savedListWidth >= 280 && savedListWidth <= 900 ? savedListWidth : 340
+    loading: false, error: '', messageCache: {}, listScroll: {}, listWidth: savedListWidth >= 280 && savedListWidth <= 900 ? savedListWidth : 340
   };
 
   function esc(value) {
@@ -30,6 +30,16 @@ window.BARREL_registerMailPanel = function (api) {
 
   function account() {
     return state.accounts.filter(function (item) { return item.id === state.accountId; })[0] || null;
+  }
+
+  function mailboxScrollKey(accountId, folder) {
+    return (accountId || state.accountId || '') + ':' + (folder || state.folder || 'INBOX');
+  }
+
+  function rememberListScroll() {
+    if (!rootEl) return;
+    var list = rootEl.querySelector('.mail-col--list .mail-col__scroll');
+    if (list) state.listScroll[list.dataset.mailboxKey || mailboxScrollKey()] = list.scrollTop;
   }
 
   function initials(value) {
@@ -247,6 +257,7 @@ window.BARREL_registerMailPanel = function (api) {
   function renderMailbox() {
     var active = account();
     if (!active) { renderNoMailbox(); return; }
+    rememberListScroll();
     rootEl.innerHTML = '';
     var toolbar = el('div', 'mail-toolbar');
     var select = el('select', 'mail-select');
@@ -258,7 +269,7 @@ window.BARREL_registerMailPanel = function (api) {
       option.selected = item.id === state.accountId;
       select.appendChild(option);
     });
-    select.addEventListener('change', function () { state.accountId = select.value; state.folders = []; state.messages = []; loadMailbox(true); });
+    select.addEventListener('change', function () { rememberListScroll(); state.accountId = select.value; state.folders = []; state.messages = []; loadMailbox(true); });
     toolbar.appendChild(select);
     var test = el('button', 'btn btn--sm', 'TEST CONNECTION');
     test.disabled = state.loading;
@@ -290,7 +301,7 @@ window.BARREL_registerMailPanel = function (api) {
     (state.folders || []).forEach(function (folder) {
       var count = state.folder === folder.id ? state.messages.length : '';
       var button = el('button', 'mail-folder' + (state.folder === folder.id ? ' active' : ''), '<span>' + esc(folder.label) + '</span>' + (count !== '' ? '<span class="badge">' + count + '</span>' : ''));
-      button.addEventListener('click', function () { if (state.folder !== folder.id) { state.folder = folder.id; loadMailbox(false); } });
+      button.addEventListener('click', function () { if (state.folder !== folder.id) { rememberListScroll(); state.folder = folder.id; loadMailbox(false); } });
       folderList.appendChild(button);
     });
     folders.appendChild(folderList);
@@ -300,6 +311,9 @@ window.BARREL_registerMailPanel = function (api) {
     var currentFolder = state.folders.filter(function (folder) { return folder.id === state.folder; })[0] || { label: 'Mailbox' };
     listColumn.appendChild(el('div', 'mail-col__head', '<h3>' + esc(currentFolder.label) + '</h3><span class="cnt">' + (state.loading ? '...' : state.messages.length + ' MSG') + '</span>'));
     var list = el('div', 'mail-col__scroll');
+    var listKey = mailboxScrollKey();
+    list.dataset.mailboxKey = listKey;
+    list.addEventListener('scroll', function () { state.listScroll[listKey] = list.scrollTop; });
     if (state.loading) list.appendChild(el('div', 'mail-loading', 'LOADING MESSAGES'));
     else if (state.error) list.appendChild(el('div', 'mail-empty', esc(state.error)));
     else if (!state.messages.length) list.appendChild(el('div', 'mail-empty', 'NO MESSAGES'));
@@ -323,6 +337,9 @@ window.BARREL_registerMailPanel = function (api) {
     renderReader(reader);
     app.appendChild(reader);
     rootEl.appendChild(app);
+    window.requestAnimationFrame(function () {
+      if (list.isConnected) list.scrollTop = state.listScroll[listKey] || 0;
+    });
   }
 
   function setupSplitter(app, splitter) {
