@@ -107,16 +107,22 @@ window.BARREL_registerMailPanel = function (api) {
 
   function appendLinkifiedText(container, value) {
     var text = value || '(No text content)';
-    var pattern = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+    var pattern = /<(https?:\/\/[^<>\s]+)>|\b(?:https?:\/\/|www\.)[^\s<>"']+|\*\*[^*\r\n]+\*\*|\*[^*\r\n]+\*/gi;
     var cursor = 0;
     var match;
     while ((match = pattern.exec(text))) {
       container.appendChild(document.createTextNode(text.slice(cursor, match.index)));
-      var visible = match[0].replace(/[.,;:!?]+$/, '');
-      var trailing = match[0].slice(visible.length);
-      if (!visible) {
-        container.appendChild(document.createTextNode(match[0]));
+      var token = match[0];
+      if (token.charAt(0) === '*') {
+        var doubleMarker = token.slice(0, 2) === '**';
+        var emphasis = document.createElement(doubleMarker ? 'strong' : 'em');
+        emphasis.className = doubleMarker ? 'mail-strong' : 'mail-emphasis';
+        emphasis.textContent = token.slice(doubleMarker ? 2 : 1, doubleMarker ? -2 : -1);
+        container.appendChild(emphasis);
       } else {
+        var wrapped = token.charAt(0) === '<';
+        var visible = wrapped ? token.slice(1, -1) : token.replace(/[.,;:!?]+$/, '');
+        var trailing = wrapped ? '' : token.slice(visible.length);
         var href = visible.indexOf('www.') === 0 ? 'https://' + visible : visible;
         var link = document.createElement('a');
         link.className = 'mail-link';
