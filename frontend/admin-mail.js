@@ -229,18 +229,29 @@ window.BARREL_registerMailPanel = function (api) {
       reader.innerHTML = '<div class="mail-reader-empty">LOADING MESSAGE</div>';
       return;
     }
-    var sender = message.from || {};
     var wrap = el('div', 'mail-reader');
     var back = el('button', 'btn btn--ghost btn--sm', 'BACK');
     back.style.marginBottom = '16px';
     back.addEventListener('click', function () { state.selected = null; renderMailbox(); });
     wrap.appendChild(back);
     var header = el('div');
-    header.innerHTML = '<h2 class="mail-reader__subject">' + esc(message.subject) + '</h2><div class="mail-reader__meta"><div class="mail-avatar">' + esc(initials(sender.name || sender.email)) + '</div><div class="mail-reader__who"><div class="name">' + esc(sender.name || sender.email || 'Unknown sender') + '</div><div class="email">' + esc(sender.email || '') + '</div></div><div class="mail-reader__date">' + esc(fullDate(message.date)) + '</div></div>';
+    header.innerHTML = '<h2 class="mail-reader__subject">' + esc(message.subject) + '</h2>';
     wrap.appendChild(header);
-    var body = el('div', 'mail-reader__body');
-    body.textContent = message.body || '(No text content)';
-    wrap.appendChild(body);
+    var thread = el('div', 'mail-thread');
+    var blocks = message.thread && message.thread.length ? message.thread : [{ from: message.from || {}, body: message.body || '(No text content)', date: message.date }];
+    blocks.forEach(function (block, index) {
+      var blockSender = block.from || block;
+      var name = blockSender.name || blockSender.email || 'Unknown sender';
+      var email = blockSender.email || '';
+      var date = block.date ? fullDate(block.date) : (block.date_label || '');
+      var item = el('article', 'mail-thread__item' + (index === 0 ? ' current' : ''));
+      item.innerHTML = '<div class="mail-thread__head"><div class="mail-avatar">' + esc(initials(name)) + '</div><div class="mail-reader__who"><div class="name">' + esc(name) + '</div><div class="email">' + esc(email) + '</div></div><div class="mail-reader__date">' + esc(date) + '</div></div>';
+      var text = el('div', 'mail-thread__body');
+      text.textContent = block.body || '(No text content)';
+      item.appendChild(text);
+      thread.appendChild(item);
+    });
+    wrap.appendChild(thread);
     var actions = el('div', 'mail-reader__actions');
     var reply = el('button', 'btn btn--primary', 'REPLY');
     reply.addEventListener('click', function () { openCompose({ mode: 'reply', message: message }); });

@@ -324,6 +324,99 @@ def _extract_text(message) -> str:
     return html_fallback.replace("\xa0", " ").strip()
 
 
+def _unquote_line(line: str) -> str:
+    """Remove plain-text quote markers while retaining the original text."""
+    return re.sub(r"^\s*(?:>\s*)+", "", line).rstrip()
+
+
+def _quoted_author(line: str) -> dict | None:
+    """Parse the common `On ..., Name <email> wrote:` reply separator."""
+    line = _unquote_line(line).strip()
+    match = re.match(r"^(?:[-–—]{2,}\s*)?On\s+(.+?)\s+wrote:\s*$", line, flags=re.IGNORECASE)
+    if not match:
+        return None
+    details = match.group(1)
+    if ", " in details:
+        date_label, sender_text = details.rsplit(", ", 1)
+    else:
+        date_label, sender_text = "", details
+    name, email = parseaddr(sender_text)
+    return {
+        "name": _decode_header(name) or sender_text.strip() or "Previous sender",
+        "email": email,
+        "date": _message_date(date_label),
+        "date_label": date_label,
+    }
+
+
+def _outlook_quote(lines: list[str], start: int) -> tuple[dict, int] | None:
+    """Parse an Outlook-style quoted header block before its message text."""
+    first = _unquote_line(lines[start]).strip()
+    if not first.lower().startswith("from:"):
+        return None
+    fields: dict[str, str] = {}
+    end = start
+    for index in range(start, min(len(lines), start + 8)):
+        line = _unquote_line(lines[index]).strip()
+        if not line:
+            end = index + 1
+            break
+        key, separator, value = line.partition(":")
+        if not separator or key.lower() not in {"from", "sent", "date", "to", "subject"}:
+            break
+        fields[key.lower()] = value.strip()
+        end = index + 1
+    if "from" not in fields or not ({"sent", "date"} & fields.keys()):
+        return None
+    name, email = parseaddr(fields["from"])
+    date_label = fields.get("sent") or fields.get("date") or ""
+    return (
+        {
+            "name": _decode_header(name) or fields["from"] or "Previous sender",
+            "email": email,
+            "date": _message_date(date_label),
+            "date_label": date_label,
+        },
+        end,
+    )
+
+
+def _thread_blocks(body: str, sender: dict, date: str | None) -> list[dict]:
+    """Turn quoted reply text into newest-first conversation blocks for the UI."""
+    current = {
+        "name": sender.get("name") or sender.get("email") or "Unknown sender",
+        "email": sender.get("email") or "",
+        "date": date,
+        "date_label": "",
+    }
+    blocks = []
+    lines = body.splitlines()
+    collected: list[str] = []
+
+    def append_block(metadata: dict, content: list[str]) -> None:
+        text = "\n".join(_unquote_line(line) for line in content).strip()
+        if text:
+            blocks.append({**metadata, "body": text})
+
+    index = 0
+    while index < len(lines):
+        quoted = _quoted_author(lines[index])
+        outlook = _outlook_quote(lines, index)
+        if quoted or outlook:
+            append_block(current, collected)
+            collected = []
+            if quoted:
+                current = quoted
+                index += 1
+            else:
+                current, index = outlook
+            continue
+        collected.append(lines[index])
+        index += 1
+    append_block(current, collected)
+    return blocks or [{**current, "body": body.strip() or "(No text content)"}]
+
+
 def get_message(config: MailboxConfig, folder: str, message_id: str) -> dict:
     client = _connect_imap(config)
     try:
@@ -336,6 +429,7 @@ def get_message(config: MailboxConfig, folder: str, message_id: str) -> dict:
         result = _message_summary(message_id.encode(), data)
         message = BytesParser(policy=policy.default).parsebytes(_extract_message_bytes(data))
         result["body"] = _extract_text(message)
+        result["thread"] = _thread_blocks(result["body"], result["from"], result["date"])
         return result
     finally:
         _logout(client)
