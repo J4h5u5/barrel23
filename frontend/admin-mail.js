@@ -52,6 +52,140 @@ window.BARREL_registerMailPanel = function (api) {
     return new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
+  function fileSize(bytes) {
+    if (!bytes) return '0 KB';
+    if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1) + ' MB';
+  }
+
+  function attachmentKind(attachment) {
+    var type = (attachment.content_type || '').toLowerCase();
+    var name = (attachment.filename || '').toLowerCase();
+    if (type.indexOf('image/') === 0 || /\.(avif|gif|jpe?g|png|webp)$/i.test(name)) return 'image';
+    if (type.indexOf('audio/') === 0 || /\.(aac|flac|m4a|mp3|ogg|opus|wav)$/i.test(name)) return 'audio';
+    if (type.indexOf('video/') === 0 || /\.(m4v|mov|mp4|webm)$/i.test(name)) return 'video';
+    return 'file';
+  }
+
+  function attachmentUrl(message, attachment) {
+    var id = String(attachment.id);
+    message._attachmentUrls = message._attachmentUrls || {};
+    message._attachmentRequests = message._attachmentRequests || {};
+    if (message._attachmentUrls[id]) return Promise.resolve(message._attachmentUrls[id]);
+    if (message._attachmentRequests[id]) return message._attachmentRequests[id];
+    var path = '/api/mail/accounts/' + encodeURIComponent(state.accountId) + '/messages/' + encodeURIComponent(message.id) +
+      '/attachments/' + encodeURIComponent(attachment.id) + '?folder=' + encodeURIComponent(state.folder);
+    message._attachmentRequests[id] = apiFetch(path).then(function (response) {
+      if (response.ok) return response.blob();
+      return response.text().then(function (text) {
+        var data = {};
+        try { data = text ? JSON.parse(text) : {}; } catch (error) {}
+        throw new Error(data.detail || 'Could not load attachment');
+      });
+    }).then(function (blob) {
+      var url = URL.createObjectURL(blob);
+      message._attachmentUrls[id] = url;
+      delete message._attachmentRequests[id];
+      return url;
+    }).catch(function (error) {
+      delete message._attachmentRequests[id];
+      throw error;
+    });
+    return message._attachmentRequests[id];
+  }
+
+  function appendLinkifiedText(container, value) {
+    var text = value || '(No text content)';
+    var pattern = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+    var cursor = 0;
+    var match;
+    while ((match = pattern.exec(text))) {
+      container.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+      var visible = match[0].replace(/[.,;:!?]+$/, '');
+      var trailing = match[0].slice(visible.length);
+      if (!visible) {
+        container.appendChild(document.createTextNode(match[0]));
+      } else {
+        var href = visible.indexOf('www.') === 0 ? 'https://' + visible : visible;
+        var link = document.createElement('a');
+        link.className = 'mail-link';
+        link.href = href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = visible;
+        container.appendChild(link);
+        if (trailing) container.appendChild(document.createTextNode(trailing));
+      }
+      cursor = pattern.lastIndex;
+    }
+    container.appendChild(document.createTextNode(text.slice(cursor)));
+  }
+
+  function openMediaPreview(url, attachment, kind) {
+    var backdrop = el('div', 'mail-preview-backdrop');
+    var preview = el('div', 'mail-preview');
+    var close = el('button', 'mail-preview__close', 'x');
+    close.title = 'Close preview';
+    close.addEventListener('click', function () { backdrop.remove(); });
+    backdrop.addEventListener('click', function (event) { if (event.target === backdrop) backdrop.remove(); });
+    preview.appendChild(close);
+    preview.appendChild(el('div', 'mail-preview__name', esc(attachment.filename)));
+    var media = document.createElement(kind === 'image' ? 'img' : kind === 'video' ? 'video' : 'audio');
+    media.src = url;
+    if (kind !== 'image') media.controls = true;
+    if (kind === 'video') media.preload = 'metadata';
+    media.alt = attachment.filename || 'Attachment preview';
+    preview.appendChild(media);
+    backdrop.appendChild(preview);
+    document.body.appendChild(backdrop);
+  }
+
+  function downloadAttachment(message, attachment) {
+    attachmentUrl(message, attachment).then(function (url) {
+      var link = document.createElement('a');
+      link.href = url;
+      link.download = attachment.filename || 'attachment';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }).catch(function (error) { toast(error.message); });
+  }
+
+  function renderAttachments(message) {
+    var attachments = message.attachments || [];
+    if (!attachments.length) return null;
+    var section = el('section', 'mail-received-attachments');
+    section.appendChild(el('div', 'mail-received-attachments__title', 'ATTACHMENTS · ' + attachments.length));
+    var list = el('div', 'mail-received-attachments__list');
+    attachments.forEach(function (attachment) {
+      var kind = attachmentKind(attachment);
+      var item = el('article', 'mail-received-file mail-received-file--' + kind);
+      item.innerHTML = '<div class="mail-received-file__type">' + esc(kind.toUpperCase()) + '</div><div class="mail-received-file__info"><strong>' + esc(attachment.filename || 'attachment') + '</strong><span>' + esc(attachment.content_type || 'file') + ' · ' + esc(fileSize(attachment.size)) + '</span></div>';
+      var actions = el('div', 'mail-received-file__actions');
+      if (kind !== 'file') {
+        var preview = el('button', 'btn btn--sm', kind === 'image' ? 'VIEW' : 'PLAY');
+        preview.addEventListener('click', function () {
+          preview.disabled = true;
+          preview.textContent = 'LOADING...';
+          attachmentUrl(message, attachment).then(function (url) {
+            openMediaPreview(url, attachment, kind);
+          }).catch(function (error) { toast(error.message); }).finally(function () {
+            preview.disabled = false;
+            preview.textContent = kind === 'image' ? 'VIEW' : 'PLAY';
+          });
+        });
+        actions.appendChild(preview);
+      }
+      var download = el('button', 'btn btn--ghost btn--sm', 'DOWNLOAD');
+      download.addEventListener('click', function () { downloadAttachment(message, attachment); });
+      actions.appendChild(download);
+      item.appendChild(actions);
+      list.appendChild(item);
+    });
+    section.appendChild(list);
+    return section;
+  }
+
   function renderLoading(text) {
     rootEl.innerHTML = '<div class="mail-loading">' + esc(text || 'LOADING MAILBOX') + '</div>';
   }
@@ -247,11 +381,13 @@ window.BARREL_registerMailPanel = function (api) {
       var item = el('article', 'mail-thread__item' + (index === 0 ? ' current' : ''));
       item.innerHTML = '<div class="mail-thread__head"><div class="mail-avatar">' + esc(initials(name)) + '</div><div class="mail-reader__who"><div class="name">' + esc(name) + '</div><div class="email">' + esc(email) + '</div></div><div class="mail-reader__date">' + esc(date) + '</div></div>';
       var text = el('div', 'mail-thread__body');
-      text.textContent = block.body || '(No text content)';
+      appendLinkifiedText(text, block.body);
       item.appendChild(text);
       thread.appendChild(item);
     });
     wrap.appendChild(thread);
+    var attachments = renderAttachments(message);
+    if (attachments) wrap.appendChild(attachments);
     var actions = el('div', 'mail-reader__actions');
     var reply = el('button', 'btn btn--primary', 'REPLY');
     reply.addEventListener('click', function () { openCompose({ mode: 'reply', message: message }); });

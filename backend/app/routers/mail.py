@@ -1,7 +1,9 @@
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,7 @@ from ..mail_client import (
     decrypt_password,
     default_mailbox,
     encrypt_password,
+    get_message_attachment,
     get_message,
     list_folders,
     list_messages,
@@ -206,6 +209,33 @@ def read_message(
         return get_message(config, folder, message_id)
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
+
+
+@router.get("/accounts/{account_id}/messages/{message_id}/attachments/{attachment_id}")
+def read_attachment(
+    account_id: str,
+    message_id: str,
+    attachment_id: int,
+    folder: str = Query("INBOX", min_length=1, max_length=255),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    config, _ = _get_mailbox(db, account_id)
+    try:
+        attachment = get_message_attachment(config, folder, message_id, attachment_id)
+    except MailClientError as exc:
+        if str(exc) == "Attachment was not found":
+            raise HTTPException(404, str(exc)) from exc
+        raise _mail_failure(exc) from exc
+    return Response(
+        content=attachment.content,
+        media_type=attachment.content_type,
+        headers={
+            "Content-Disposition": "inline; filename*=UTF-8''" + quote(attachment.filename, safe=""),
+            "Cache-Control": "private, max-age=300",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.post("/accounts/{account_id}/send")

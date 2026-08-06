@@ -324,6 +324,44 @@ def _extract_text(message) -> str:
     return html_fallback.replace("\xa0", " ").strip()
 
 
+def _message_attachments(message) -> list[MailAttachment]:
+    """Extract only actual message files, including inline photo/audio/video parts."""
+    attachments = []
+    for part in message.walk() if message.is_multipart() else [message]:
+        if part.is_multipart():
+            continue
+        disposition = (part.get_content_disposition() or "").lower()
+        filename = _decode_header(part.get_filename())
+        content_type = part.get_content_type()
+        is_media = content_type.startswith(("image/", "audio/", "video/"))
+        if disposition not in {"attachment", "inline"} and not filename:
+            continue
+        if not filename and not (disposition == "inline" and is_media):
+            continue
+        try:
+            content = part.get_payload(decode=True) or b""
+        except Exception:
+            content = b""
+        if not content:
+            continue
+        # Never return a path supplied by a mail sender as a filename.
+        filename = re.split(r"[\\\\/]", filename or "attachment")[-1].strip() or "attachment"
+        attachments.append(MailAttachment(filename=filename, content=content, content_type=content_type))
+    return attachments
+
+
+def _attachment_metadata(attachments: list[MailAttachment]) -> list[dict]:
+    return [
+        {
+            "id": index,
+            "filename": attachment.filename,
+            "content_type": attachment.content_type,
+            "size": len(attachment.content),
+        }
+        for index, attachment in enumerate(attachments)
+    ]
+
+
 def _unquote_line(line: str) -> str:
     """Remove plain-text quote markers while retaining the original text."""
     return re.sub(r"^\s*(?:>\s*)+", "", line).rstrip()
@@ -510,7 +548,27 @@ def get_message(config: MailboxConfig, folder: str, message_id: str) -> dict:
         message = BytesParser(policy=policy.default).parsebytes(_extract_message_bytes(data))
         result["body"] = _extract_text(message)
         result["thread"] = _thread_blocks(result["body"], result["from"], result["date"])
+        result["attachments"] = _attachment_metadata(_message_attachments(message))
         return result
+    finally:
+        _logout(client)
+
+
+def get_message_attachment(config: MailboxConfig, folder: str, message_id: str, attachment_id: int) -> MailAttachment:
+    """Load one attachment by index after verifying it belongs to the selected message."""
+    client = _connect_imap(config)
+    try:
+        status, _ = client.select(folder, readonly=True)
+        if status != "OK":
+            raise MailClientError("Could not open this mailbox folder")
+        status, data = client.uid("fetch", message_id, "(BODY.PEEK[])")
+        if status != "OK":
+            raise MailClientError("Could not read this message")
+        message = BytesParser(policy=policy.default).parsebytes(_extract_message_bytes(data))
+        attachments = _message_attachments(message)
+        if attachment_id < 0 or attachment_id >= len(attachments):
+            raise MailClientError("Attachment was not found")
+        return attachments[attachment_id]
     finally:
         _logout(client)
 
