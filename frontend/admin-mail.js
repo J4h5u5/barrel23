@@ -74,6 +74,7 @@ window.BARREL_registerMailPanel = function (api) {
     if (type.indexOf('image/') === 0 || /\.(avif|gif|jpe?g|png|webp)$/i.test(name)) return 'image';
     if (type.indexOf('audio/') === 0 || /\.(aac|flac|m4a|mp3|ogg|opus|wav)$/i.test(name)) return 'audio';
     if (type.indexOf('video/') === 0 || /\.(m4v|mov|mp4|webm)$/i.test(name)) return 'video';
+    if (type === 'application/pdf' || /\.pdf$/i.test(name)) return 'pdf';
     return 'file';
   }
 
@@ -140,11 +141,16 @@ window.BARREL_registerMailPanel = function (api) {
     backdrop.addEventListener('click', function (event) { if (event.target === backdrop) backdrop.remove(); });
     preview.appendChild(close);
     preview.appendChild(el('div', 'mail-preview__name', esc(attachment.filename)));
-    var media = document.createElement(kind === 'image' ? 'img' : kind === 'video' ? 'video' : 'audio');
+    var media = document.createElement(kind === 'image' ? 'img' : kind === 'video' ? 'video' : kind === 'pdf' ? 'iframe' : 'audio');
     media.src = url;
     if (kind !== 'image') media.controls = true;
     if (kind === 'video') media.preload = 'metadata';
-    media.alt = attachment.filename || 'Attachment preview';
+    if (kind === 'pdf') {
+      media.title = attachment.filename || 'PDF preview';
+      media.setAttribute('referrerpolicy', 'no-referrer');
+    } else {
+      media.alt = attachment.filename || 'Attachment preview';
+    }
     preview.appendChild(media);
     backdrop.appendChild(preview);
     document.body.appendChild(backdrop);
@@ -173,7 +179,8 @@ window.BARREL_registerMailPanel = function (api) {
       item.innerHTML = '<div class="mail-received-file__type">' + esc(kind.toUpperCase()) + '</div><div class="mail-received-file__info"><strong>' + esc(attachment.filename || 'attachment') + '</strong><span>' + esc(attachment.content_type || 'file') + ' · ' + esc(fileSize(attachment.size)) + '</span></div>';
       var actions = el('div', 'mail-received-file__actions');
       if (kind !== 'file') {
-        var preview = el('button', 'btn btn--sm', kind === 'image' ? 'VIEW' : 'PLAY');
+        var previewLabel = kind === 'image' ? 'VIEW' : kind === 'pdf' ? 'VIEW PDF' : 'PLAY';
+        var preview = el('button', 'btn btn--sm', previewLabel);
         preview.addEventListener('click', function () {
           preview.disabled = true;
           preview.textContent = 'LOADING...';
@@ -181,7 +188,7 @@ window.BARREL_registerMailPanel = function (api) {
             openMediaPreview(url, attachment, kind);
           }).catch(function (error) { toast(error.message); }).finally(function () {
             preview.disabled = false;
-            preview.textContent = kind === 'image' ? 'VIEW' : 'PLAY';
+            preview.textContent = previewLabel;
           });
         });
         actions.appendChild(preview);
