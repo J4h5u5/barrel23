@@ -332,7 +332,7 @@ def _unquote_line(line: str) -> str:
 def _quote_metadata(date_label: str, sender_text: str) -> dict:
     name, email = parseaddr(sender_text.strip().rstrip(":"))
     return {
-        "name": _decode_header(name) or sender_text.strip().rstrip(":") or "Previous sender",
+        "name": _decode_header(name) or email or sender_text.strip().rstrip(":") or "Previous sender",
         "email": email,
         "date": _message_date(date_label),
         "date_label": date_label.strip(" ,"),
@@ -371,6 +371,22 @@ def _quoted_author(line: str) -> dict | None:
         date_label, sender_text = _split_date_and_sender(english.group(1))
         return _quote_metadata(date_label, sender_text)
 
+    spanish = re.match(
+        r"^El\s+(?P<date>.+?),\s+a las\s+(?P<time>\d{1,2}:\d{2}),\s*(?P<sender>.+?)\s+escribió:\s*$",
+        line,
+        flags=re.IGNORECASE,
+    )
+    if spanish:
+        return _quote_metadata(
+            spanish.group("date") + ", a las " + spanish.group("time"),
+            spanish.group("sender"),
+        )
+    spanish_author_only = re.match(
+        r"^(?P<sender>.*<[^<>\s]+@[^<>\s]+>)\s+escribió:\s*$", line, flags=re.IGNORECASE
+    )
+    if spanish_author_only:
+        return _quote_metadata("", spanish_author_only.group("sender"))
+
     # Dutch, German, Swedish and Russian Gmail formats put the author after a verb.
     localized = [
         r"^Op\s+(?P<date>.+?)\s+schreef\s+(?P<sender>.+?):\s*$",
@@ -392,6 +408,20 @@ def _quoted_author(line: str) -> dict | None:
     if generic:
         return _quote_metadata(generic.group("date"), generic.group("sender"))
     return None
+
+
+def _quoted_author_at(lines: list[str], index: int) -> tuple[dict | None, int]:
+    """Handle quote separators split across a name line and an email line."""
+    parsed = _quoted_author(lines[index])
+    if parsed:
+        return parsed, 1
+    if index + 1 >= len(lines):
+        return None, 0
+    next_line = _unquote_line(lines[index + 1]).strip()
+    if not re.fullmatch(r"<[^<>\s]+@[^<>\s]+>(?:\s+(?:wrote|escribió))?:", next_line, flags=re.IGNORECASE):
+        return None, 0
+    parsed = _quoted_author(_unquote_line(lines[index]).strip() + " " + next_line)
+    return (parsed, 2) if parsed else (None, 0)
 
 
 def _outlook_quote(lines: list[str], start: int) -> tuple[dict, int] | None:
@@ -450,14 +480,14 @@ def _thread_blocks(body: str, sender: dict, date: str | None) -> list[dict]:
 
     index = 0
     while index < len(lines):
-        quoted = _quoted_author(lines[index])
+        quoted, quoted_lines = _quoted_author_at(lines, index)
         outlook = _outlook_quote(lines, index)
         if quoted or outlook:
             append_block(current, collected)
             collected = []
             if quoted:
                 current = quoted
-                index += 1
+                index += quoted_lines
             else:
                 current, index = outlook
             continue
