@@ -10,6 +10,7 @@
   var TOKEN_KEY = 'barrel23_admin_token';
   var C = null;
   var dirty = false;
+  var authRedirecting = false;
 
   /* ============================================================
      AUTH
@@ -23,7 +24,14 @@
     opts.headers = opts.headers || {};
     var token = getToken();
     if (token) opts.headers['Authorization'] = 'Bearer ' + token;
-    return fetch(path, opts);
+    return fetch(path, opts).then(function (response) {
+      if (response.status === 401 && token && !authRedirecting) {
+        authRedirecting = true;
+        clearToken();
+        showLogin('Session expired. Please sign in again.');
+      }
+      return response;
+    });
   }
 
   function showLogin(errorMsg) {
