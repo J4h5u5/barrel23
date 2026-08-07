@@ -230,33 +230,39 @@ def list_folders(config: MailboxConfig) -> list[dict]:
         _logout(client)
 
 
-def _list_messages_from_client(client, folder: str, limit: int) -> list[dict]:
+def _list_messages_from_client(client, folder: str, limit: int, offset: int = 0) -> tuple[list[dict], int]:
     status, _ = client.select(folder, readonly=True)
     if status != "OK":
         raise MailClientError("Could not open this mailbox folder")
     status, data = client.uid("search", None, "ALL")
     if status != "OK" or not data:
-        return []
-    uids = data[0].split()[-limit:]
+        return [], 0
+    all_uids = data[0].split()
+    total = len(all_uids)
+    end = max(0, total - max(offset, 0))
+    uids = all_uids[max(0, end - limit):end]
     if not uids:
-        return []
+        return [], total
     status, message_data = client.uid(
         "fetch", b",".join(uids), "(UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)] FLAGS)"
     )
     if status != "OK":
         raise MailClientError("Could not read message headers")
-    return _message_summaries(message_data, uids)
+    return _message_summaries(message_data, uids), total
 
 
-def list_messages(config: MailboxConfig, folder: str, limit: int = 40) -> list[dict]:
+def list_messages(config: MailboxConfig, folder: str, limit: int = 40, offset: int = 0) -> list[dict]:
     client = _connect_imap(config)
     try:
-        return _list_messages_from_client(client, folder, limit)
+        messages, _ = _list_messages_from_client(client, folder, limit, offset)
+        return messages
     finally:
         _logout(client)
 
 
-def load_mailbox(config: MailboxConfig, folder: str, limit: int = 40, include_folders: bool = True) -> dict:
+def load_mailbox(
+    config: MailboxConfig, folder: str, limit: int = 40, include_folders: bool = True, offset: int = 0
+) -> dict:
     """Load the folder navigation and message headers through one IMAP login."""
     client = _connect_imap(config)
     try:
@@ -264,10 +270,12 @@ def load_mailbox(config: MailboxConfig, folder: str, limit: int = 40, include_fo
         selected_folder = folder
         if folders and not any(item["id"] == selected_folder for item in folders):
             selected_folder = folders[0]["id"]
+        messages, message_total = _list_messages_from_client(client, selected_folder, limit, offset)
         return {
             "folders": folders,
             "folder": selected_folder,
-            "messages": _list_messages_from_client(client, selected_folder, limit),
+            "messages": messages,
+            "message_total": message_total,
         }
     finally:
         _logout(client)
@@ -296,6 +304,20 @@ class _HTMLToText(HTMLParser):
         return "\n".join(line for line in lines if line)
 
 
+def _html_to_text(text: str) -> str:
+    parser = _HTMLToText()
+    try:
+        parser.feed(text)
+        parser.close()
+        return parser.text()
+    except Exception:
+        return unescape(re.sub(r"<[^>]+>", " ", text))
+
+
+def _looks_like_html(text: str) -> bool:
+    return bool(re.search(r"<\s*(?:!doctype|html|body|p|div|br|table|tr|td|a)\b", text, flags=re.IGNORECASE))
+
+
 def _extract_text(message) -> str:
     candidates: Iterable = message.walk() if message.is_multipart() else [message]
     html_fallback = ""
@@ -313,14 +335,14 @@ def _extract_text(message) -> str:
         text = str(payload)
         if content_type == "text/plain":
             # Some senders put HTML entities into their text alternative.
-            return unescape(text).replace("\xa0", " ").strip()
-        parser = _HTMLToText()
-        try:
-            parser.feed(text)
-            parser.close()
-            html_fallback = parser.text()
-        except Exception:
-            html_fallback = unescape(re.sub(r"<[^>]+>", " ", text))
+            plain_text = unescape(text).replace("\xa0", " ").strip()
+            if not _looks_like_html(plain_text):
+                return plain_text
+            # Invalid senders occasionally label HTML as text/plain. Prefer a proper
+            # HTML alternative if supplied, but never render its markup directly.
+            html_fallback = _html_to_text(plain_text)
+            continue
+        html_fallback = _html_to_text(text)
     return html_fallback.replace("\xa0", " ").strip()
 
 

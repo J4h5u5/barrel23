@@ -170,12 +170,13 @@ def get_messages(
     account_id: str,
     folder: str = Query("INBOX", min_length=1, max_length=255),
     limit: int = Query(40, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     _=Depends(get_current_admin),
 ):
     config, _ = _get_mailbox(db, account_id)
     try:
-        return {"messages": list_messages(config, folder, limit)}
+        return {"messages": list_messages(config, folder, limit, offset)}
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
 
@@ -185,13 +186,14 @@ def get_mailbox(
     account_id: str,
     folder: str = Query("INBOX", min_length=1, max_length=255),
     limit: int = Query(40, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     include_folders: bool = Query(True),
     db: Session = Depends(get_db),
     _=Depends(get_current_admin),
 ):
     config, _ = _get_mailbox(db, account_id)
     try:
-        return load_mailbox(config, folder, limit, include_folders)
+        return load_mailbox(config, folder, limit, include_folders, offset)
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
 

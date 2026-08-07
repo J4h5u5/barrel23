@@ -7,7 +7,7 @@ window.BARREL_registerMailPanel = function (api) {
   var savedListWidth = Number(localStorage.getItem('barrel23_mail_list_width'));
   var state = {
     accounts: [], accountId: null, folders: [], folder: 'INBOX', messages: [], selected: null,
-    loading: false, error: '', messageCache: {}, listScroll: {}, listWidth: savedListWidth >= 280 && savedListWidth <= 900 ? savedListWidth : 340
+    loading: false, loadingOlder: false, error: '', messageCache: {}, messageTotal: 0, listScroll: {}, listWidth: savedListWidth >= 280 && savedListWidth <= 900 ? savedListWidth : 340
   };
 
   function esc(value) {
@@ -229,6 +229,7 @@ window.BARREL_registerMailPanel = function (api) {
 
   function loadMailbox(refreshFolders) {
     state.loading = true;
+    state.loadingOlder = false;
     state.error = '';
     state.selected = null;
     renderMailbox();
@@ -238,6 +239,7 @@ window.BARREL_registerMailPanel = function (api) {
       if (mailbox.folders && mailbox.folders.length) state.folders = mailbox.folders;
       state.folder = mailbox.folder || state.folder;
       state.messages = mailbox.messages || [];
+      state.messageTotal = Number(mailbox.message_total) || state.messages.length;
       state.loading = false;
       renderMailbox();
     }).catch(function (error) {
@@ -245,6 +247,28 @@ window.BARREL_registerMailPanel = function (api) {
       state.error = error.message;
       renderMailbox();
     });
+  }
+
+  function loadOlderMessages() {
+    if (state.loading || state.loadingOlder || state.messages.length >= state.messageTotal) return;
+    state.loadingOlder = true;
+    var accountId = state.accountId;
+    var folder = state.folder;
+    var offset = state.messages.length;
+    renderMailbox();
+    request('/api/mail/accounts/' + encodeURIComponent(accountId) + '/mailbox?folder=' + encodeURIComponent(folder) + '&include_folders=false&limit=50&offset=' + offset)
+      .then(function (mailbox) {
+        if (state.accountId !== accountId || state.folder !== folder) return;
+        state.messages = state.messages.concat(mailbox.messages || []);
+        state.messageTotal = Number(mailbox.message_total) || state.messages.length;
+      }).catch(function (error) {
+        if (state.accountId === accountId && state.folder === folder) toast(error.message);
+      }).finally(function () {
+        if (state.accountId === accountId && state.folder === folder) {
+          state.loadingOlder = false;
+          renderMailbox();
+        }
+      });
   }
 
   function renderError(message) {
@@ -312,7 +336,7 @@ window.BARREL_registerMailPanel = function (api) {
     folders.appendChild(compose);
     var folderList = el('div', 'mail-col__scroll');
     (state.folders || []).forEach(function (folder) {
-      var count = state.folder === folder.id ? state.messages.length : '';
+      var count = state.folder === folder.id ? (state.messageTotal || state.messages.length) : '';
       var button = el('button', 'mail-folder' + (state.folder === folder.id ? ' active' : ''), '<span>' + esc(folder.label) + '</span>' + (count !== '' ? '<span class="badge">' + count + '</span>' : ''));
       button.addEventListener('click', function () { if (state.folder !== folder.id) { rememberListScroll(); state.folder = folder.id; loadMailbox(false); } });
       folderList.appendChild(button);
@@ -322,7 +346,9 @@ window.BARREL_registerMailPanel = function (api) {
 
     var listColumn = el('div', 'mail-col mail-col--list');
     var currentFolder = state.folders.filter(function (folder) { return folder.id === state.folder; })[0] || { label: 'Mailbox' };
-    listColumn.appendChild(el('div', 'mail-col__head', '<h3>' + esc(currentFolder.label) + '</h3><span class="cnt">' + (state.loading ? '...' : state.messages.length + ' MSG') + '</span>'));
+    var loadedCount = state.messages.length;
+    var totalLabel = state.messageTotal > loadedCount ? loadedCount + ' / ' + state.messageTotal : loadedCount;
+    listColumn.appendChild(el('div', 'mail-col__head', '<h3>' + esc(currentFolder.label) + '</h3><span class="cnt">' + (state.loading ? '...' : totalLabel + ' MSG') + '</span>'));
     var list = el('div', 'mail-col__scroll');
     var listKey = mailboxScrollKey();
     list.dataset.mailboxKey = listKey;
@@ -337,6 +363,12 @@ window.BARREL_registerMailPanel = function (api) {
       button.addEventListener('click', function () { readMessage(message); });
       list.appendChild(button);
     });
+    if (!state.loading && !state.error && state.messages.length && state.messages.length < state.messageTotal) {
+      var older = el('button', 'btn btn--ghost btn--sm mail-load-older', state.loadingOlder ? 'LOADING...' : 'LOAD 50 OLDER');
+      older.disabled = state.loadingOlder;
+      older.addEventListener('click', loadOlderMessages);
+      list.appendChild(older);
+    }
     listColumn.appendChild(list);
     app.appendChild(listColumn);
 
