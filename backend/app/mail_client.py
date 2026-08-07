@@ -163,13 +163,30 @@ def _has_seen_flag(data) -> bool:
     return False
 
 
-def _message_summary(uid: bytes, data) -> dict:
+def _contact(name: str, email: str) -> dict:
+    return {"name": _decode_header(name) or email or "Unknown sender", "email": email}
+
+
+def _message_counterparty(message, own_email: str) -> dict:
+    """Return the other person in a message, not the mailbox account itself."""
+    from_name, from_email = parseaddr(message.get("From", ""))
+    sender = _contact(from_name, from_email)
+    if from_email.lower() != own_email.strip().lower():
+        return sender
+    for name, email in getaddresses([message.get("To", "")]):
+        if email and email.lower() != own_email.strip().lower():
+            return _contact(name, email)
+    return sender
+
+
+def _message_summary(uid: bytes, data, own_email: str = "") -> dict:
     message = BytesParser(policy=policy.default).parsebytes(_extract_message_bytes(data))
     from_raw = message.get("From", "")
     display_name, email = parseaddr(from_raw)
     return {
         "id": uid.decode(),
-        "from": {"name": _decode_header(display_name) or email or "Unknown sender", "email": email},
+        "from": _contact(display_name, email),
+        "counterparty": _message_counterparty(message, own_email),
         "to": _decode_header(message.get("To")),
         "subject": _decode_header(message.get("Subject")) or "(no subject)",
         "date": _message_date(message.get("Date")),
@@ -177,7 +194,7 @@ def _message_summary(uid: bytes, data) -> dict:
     }
 
 
-def _message_summaries(data, requested_uids: list[bytes]) -> list[dict]:
+def _message_summaries(data, requested_uids: list[bytes], own_email: str = "") -> list[dict]:
     """Build summaries from one multi-UID FETCH response."""
     grouped: dict[bytes, list] = {}
     current_uid: bytes | None = None
@@ -190,7 +207,7 @@ def _message_summaries(data, requested_uids: list[bytes]) -> list[dict]:
             grouped[current_uid] = [item]
         elif current_uid is not None:
             grouped[current_uid].append(item)
-    summaries = {uid: _message_summary(uid, parts) for uid, parts in grouped.items()}
+    summaries = {uid: _message_summary(uid, parts, own_email) for uid, parts in grouped.items()}
     return [summaries[uid] for uid in reversed(requested_uids) if uid in summaries]
 
 
@@ -230,7 +247,9 @@ def list_folders(config: MailboxConfig) -> list[dict]:
         _logout(client)
 
 
-def _list_messages_from_client(client, folder: str, limit: int, offset: int = 0) -> tuple[list[dict], int]:
+def _list_messages_from_client(
+    client, folder: str, limit: int, offset: int = 0, own_email: str = ""
+) -> tuple[list[dict], int]:
     status, _ = client.select(folder, readonly=True)
     if status != "OK":
         raise MailClientError("Could not open this mailbox folder")
@@ -248,13 +267,13 @@ def _list_messages_from_client(client, folder: str, limit: int, offset: int = 0)
     )
     if status != "OK":
         raise MailClientError("Could not read message headers")
-    return _message_summaries(message_data, uids), total
+    return _message_summaries(message_data, uids, own_email), total
 
 
 def list_messages(config: MailboxConfig, folder: str, limit: int = 40, offset: int = 0) -> list[dict]:
     client = _connect_imap(config)
     try:
-        messages, _ = _list_messages_from_client(client, folder, limit, offset)
+        messages, _ = _list_messages_from_client(client, folder, limit, offset, config.email)
         return messages
     finally:
         _logout(client)
@@ -270,7 +289,7 @@ def load_mailbox(
         selected_folder = folder
         if folders and not any(item["id"] == selected_folder for item in folders):
             selected_folder = folders[0]["id"]
-        messages, message_total = _list_messages_from_client(client, selected_folder, limit, offset)
+        messages, message_total = _list_messages_from_client(client, selected_folder, limit, offset, config.email)
         return {
             "folders": folders,
             "folder": selected_folder,
@@ -581,7 +600,7 @@ def get_message(config: MailboxConfig, folder: str, message_id: str) -> dict:
         status, data = client.uid("fetch", message_id, "(BODY.PEEK[] FLAGS)")
         if status != "OK":
             raise MailClientError("Could not read this message")
-        result = _message_summary(message_id.encode(), data)
+        result = _message_summary(message_id.encode(), data, config.email)
         message = BytesParser(policy=policy.default).parsebytes(_extract_message_bytes(data))
         result["body"] = _extract_text(message)
         result["thread"] = _thread_blocks(result["body"], result["from"], result["date"])

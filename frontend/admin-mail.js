@@ -357,9 +357,10 @@ window.BARREL_registerMailPanel = function (api) {
     else if (state.error) list.appendChild(el('div', 'mail-empty', esc(state.error)));
     else if (!state.messages.length) list.appendChild(el('div', 'mail-empty', 'NO MESSAGES'));
     else state.messages.forEach(function (message) {
-      var sender = message.from && (message.from.name || message.from.email) || 'Unknown sender';
+      var counterparty = message.counterparty || message.from || {};
+      var sender = counterparty.name || counterparty.email || 'Unknown sender';
       var button = el('button', 'mail-msg' + (message.unread ? ' unread' : '') + (state.selected && state.selected.id === message.id ? ' active' : ''),
-        '<div class="mail-msg__top"><span class="mail-msg__from">' + esc(sender) + '</span><span class="mail-msg__time">' + esc(relTime(message.date)) + '</span></div><div class="mail-msg__subject">' + esc(message.subject) + '</div><div class="mail-msg__to">' + esc(message.to || (message.from && message.from.email) || '') + '</div>');
+        '<div class="mail-msg__top"><span class="mail-msg__from">' + esc(sender) + '</span><span class="mail-msg__time">' + esc(relTime(message.date)) + '</span></div><div class="mail-msg__subject">' + esc(message.subject) + '</div><div class="mail-msg__to">' + esc(counterparty.email || '') + '</div>');
       button.addEventListener('click', function () { readMessage(message); });
       list.appendChild(button);
     });
