@@ -300,8 +300,13 @@ class _HTMLToText(HTMLParser):
         self.parts.append(data)
 
     def text(self) -> str:
-        lines = [re.sub(r"[ \t]+", " ", line).strip() for line in "".join(self.parts).splitlines()]
+        lines = [re.sub(r"[ \t]+", " ", line).strip() for line in _clean_message_text("".join(self.parts)).splitlines()]
         return "\n".join(line for line in lines if line)
+
+
+def _clean_message_text(text: str) -> str:
+    """Drop invisible copy/paste markers frequently embedded in HTML newsletters."""
+    return unescape(text).replace("\xa0", " ").translate({codepoint: None for codepoint in range(0x200B, 0x2010)} | {0xFEFF: None})
 
 
 def _html_to_text(text: str) -> str:
@@ -311,7 +316,7 @@ def _html_to_text(text: str) -> str:
         parser.close()
         return parser.text()
     except Exception:
-        return unescape(re.sub(r"<[^>]+>", " ", text))
+        return _clean_message_text(re.sub(r"<[^>]+>", " ", text))
 
 
 def _looks_like_html(text: str) -> bool:
@@ -335,7 +340,7 @@ def _extract_text(message) -> str:
         text = str(payload)
         if content_type == "text/plain":
             # Some senders put HTML entities into their text alternative.
-            plain_text = unescape(text).replace("\xa0", " ").strip()
+            plain_text = _clean_message_text(text).strip()
             if not _looks_like_html(plain_text):
                 return plain_text
             # Invalid senders occasionally label HTML as text/plain. Prefer a proper
@@ -343,7 +348,7 @@ def _extract_text(message) -> str:
             html_fallback = _html_to_text(plain_text)
             continue
         html_fallback = _html_to_text(text)
-    return html_fallback.replace("\xa0", " ").strip()
+    return _clean_message_text(html_fallback).strip()
 
 
 def _message_attachments(message) -> list[MailAttachment]:
