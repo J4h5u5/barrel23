@@ -427,10 +427,18 @@ window.BARREL_registerMailPanel = function (api) {
       return;
     }
     var wrap = el('div', 'mail-reader');
+    var actions = el('div', 'mail-reader__actions');
+    var reply = el('button', 'btn btn--primary', 'REPLY');
+    reply.addEventListener('click', function () { openCompose({ mode: 'reply', message: message }); });
+    var forward = el('button', 'btn', 'FORWARD');
+    forward.addEventListener('click', function () { openCompose({ mode: 'forward', message: message }); });
+    actions.appendChild(reply); actions.appendChild(forward);
+    var topbar = el('div', 'mail-reader__topbar');
     var back = el('button', 'btn btn--ghost btn--sm', 'BACK');
-    back.style.marginBottom = '16px';
     back.addEventListener('click', function () { state.selected = null; renderMailbox(); });
-    wrap.appendChild(back);
+    topbar.appendChild(back);
+    topbar.appendChild(actions);
+    wrap.appendChild(topbar);
     var header = el('div');
     header.innerHTML = '<h2 class="mail-reader__subject">' + esc(message.subject) + '</h2>';
     wrap.appendChild(header);
@@ -451,13 +459,6 @@ window.BARREL_registerMailPanel = function (api) {
     wrap.appendChild(thread);
     var attachments = renderAttachments(message);
     if (attachments) wrap.appendChild(attachments);
-    var actions = el('div', 'mail-reader__actions');
-    var reply = el('button', 'btn btn--primary', 'REPLY');
-    reply.addEventListener('click', function () { openCompose({ mode: 'reply', message: message }); });
-    var forward = el('button', 'btn', 'FORWARD');
-    forward.addEventListener('click', function () { openCompose({ mode: 'forward', message: message }); });
-    actions.appendChild(reply); actions.appendChild(forward);
-    wrap.appendChild(actions);
     reader.appendChild(wrap);
   }
 
