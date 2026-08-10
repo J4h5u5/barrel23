@@ -131,6 +131,12 @@ def _logout(client) -> None:
         pass
 
 
+def _imap_search_term(value: str) -> str:
+    """Return one quoted IMAP SEARCH argument rather than raw query syntax."""
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return '"' + escaped + '"'
+
+
 def _decode_header(value: str | None) -> str:
     try:
         return str(make_header(decode_header(value or ""))).strip()
@@ -248,12 +254,20 @@ def list_folders(config: MailboxConfig) -> list[dict]:
 
 
 def _list_messages_from_client(
-    client, folder: str, limit: int, offset: int = 0, own_email: str = ""
+    client, folder: str, limit: int, offset: int = 0, own_email: str = "", search: str = ""
 ) -> tuple[list[dict], int]:
     status, _ = client.select(folder, readonly=True)
     if status != "OK":
         raise MailClientError("Could not open this mailbox folder")
-    status, data = client.uid("search", None, "ALL")
+    if search:
+        # TEXT searches headers and message bodies. UTF-8 keeps non-English names
+        # and subjects searchable on IMAP servers that advertise UTF8=ACCEPT.
+        search_term = _imap_search_term(search)
+        status, data = client.uid("search", "UTF-8", "TEXT", search_term)
+        if status != "OK":
+            status, data = client.uid("search", None, "TEXT", search_term)
+    else:
+        status, data = client.uid("search", None, "ALL")
     if status != "OK" or not data:
         return [], 0
     all_uids = data[0].split()
@@ -270,17 +284,24 @@ def _list_messages_from_client(
     return _message_summaries(message_data, uids, own_email), total
 
 
-def list_messages(config: MailboxConfig, folder: str, limit: int = 40, offset: int = 0) -> list[dict]:
+def list_messages(
+    config: MailboxConfig, folder: str, limit: int = 40, offset: int = 0, search: str = ""
+) -> list[dict]:
     client = _connect_imap(config)
     try:
-        messages, _ = _list_messages_from_client(client, folder, limit, offset, config.email)
+        messages, _ = _list_messages_from_client(client, folder, limit, offset, config.email, search)
         return messages
     finally:
         _logout(client)
 
 
 def load_mailbox(
-    config: MailboxConfig, folder: str, limit: int = 40, include_folders: bool = True, offset: int = 0
+    config: MailboxConfig,
+    folder: str,
+    limit: int = 40,
+    include_folders: bool = True,
+    offset: int = 0,
+    search: str = "",
 ) -> dict:
     """Load the folder navigation and message headers through one IMAP login."""
     client = _connect_imap(config)
@@ -289,13 +310,36 @@ def load_mailbox(
         selected_folder = folder
         if folders and not any(item["id"] == selected_folder for item in folders):
             selected_folder = folders[0]["id"]
-        messages, message_total = _list_messages_from_client(client, selected_folder, limit, offset, config.email)
+        messages, message_total = _list_messages_from_client(
+            client, selected_folder, limit, offset, config.email, search.strip()
+        )
         return {
             "folders": folders,
             "folder": selected_folder,
             "messages": messages,
             "message_total": message_total,
         }
+    finally:
+        _logout(client)
+
+
+def restore_message(config: MailboxConfig, folder: str, message_id: str) -> None:
+    """Copy a trashed message back to INBOX, then remove only that source UID."""
+    client = _connect_imap(config)
+    try:
+        status, _ = client.select(folder, readonly=False)
+        if status != "OK":
+            raise MailClientError("Could not open this mailbox folder")
+        uid = str(message_id).encode()
+        status, _ = client.uid("copy", uid, "INBOX")
+        if status != "OK":
+            raise MailClientError("Could not copy this message to Inbox")
+        status, _ = client.uid("store", uid, "+FLAGS.SILENT", r"(\Deleted)")
+        if status != "OK":
+            raise MailClientError("Message was copied, but could not be removed from Trash")
+        status, _ = client.uid("EXPUNGE", uid)
+        if status != "OK":
+            raise MailClientError("Message was copied, but could not be removed from Trash")
     finally:
         _logout(client)
 

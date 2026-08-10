@@ -23,6 +23,7 @@ from ..mail_client import (
     list_folders,
     list_messages,
     load_mailbox,
+    restore_message,
     send_message,
     test_connection,
 )
@@ -171,12 +172,13 @@ def get_messages(
     folder: str = Query("INBOX", min_length=1, max_length=255),
     limit: int = Query(40, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    search: str = Query("", max_length=200),
     db: Session = Depends(get_db),
     _=Depends(get_current_admin),
 ):
     config, _ = _get_mailbox(db, account_id)
     try:
-        return {"messages": list_messages(config, folder, limit, offset)}
+        return {"messages": list_messages(config, folder, limit, offset, search)}
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
 
@@ -188,12 +190,13 @@ def get_mailbox(
     limit: int = Query(40, ge=1, le=100),
     offset: int = Query(0, ge=0),
     include_folders: bool = Query(True),
+    search: str = Query("", max_length=200),
     db: Session = Depends(get_db),
     _=Depends(get_current_admin),
 ):
     config, _ = _get_mailbox(db, account_id)
     try:
-        return load_mailbox(config, folder, limit, include_folders, offset)
+        return load_mailbox(config, folder, limit, include_folders, offset, search)
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
 
@@ -211,6 +214,24 @@ def read_message(
         return get_message(config, folder, message_id)
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
+
+
+@router.post("/accounts/{account_id}/messages/{message_id}/restore")
+def restore_from_trash(
+    account_id: str,
+    message_id: str,
+    folder: str = Query(..., min_length=1, max_length=255),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    if folder.lower() != "trash":
+        raise HTTPException(400, "Only messages in Trash can be restored")
+    config, _ = _get_mailbox(db, account_id)
+    try:
+        restore_message(config, folder, message_id)
+    except MailClientError as exc:
+        raise _mail_failure(exc) from exc
+    return {"ok": True, "folder": "INBOX"}
 
 
 @router.get("/accounts/{account_id}/messages/{message_id}/attachments/{attachment_id}")

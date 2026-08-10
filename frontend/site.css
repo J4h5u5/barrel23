@@ -261,16 +261,12 @@ button{ font-family: inherit; cursor: pointer; }
   margin-top: clamp(44px,6vw,80px); }
 .dj{ position:relative; aspect-ratio: 3/4; overflow:hidden; border:1px solid var(--line);
   background:#000; }
-.dj img{ width:100%; height:100%; object-fit:cover; filter: grayscale(.55) contrast(1.05);
-  transition: filter .4s, transform .6s; }
-.dj:hover img{ filter: grayscale(0) contrast(1.05); transform: scale(1.05); }
+.dj img{ width:100%; height:100%; object-fit:cover; filter: grayscale(.55) contrast(1.05); }
 .dj__scrim{ position:absolute; inset:0; background: linear-gradient(180deg, transparent 40%, rgba(8,8,10,.92)); }
 .dj__info{ position:absolute; left:14px; right:14px; bottom:14px; z-index:2; }
 .dj__role{ font-family:var(--mono); font-size:10px; letter-spacing:.3em; color: var(--red); }
 .dj__name{ font-family: var(--display); font-size: 26px; line-height:1; margin-top:4px; }
-.dj__socials{ display:flex; gap:10px; margin-top:10px; opacity:0; transform: translateY(8px);
-  transition: .3s; }
-.dj:hover .dj__socials{ opacity:1; transform:none; }
+.dj__socials{ display:flex; gap:10px; margin-top:10px; }
 .dj__socials a{ width:30px; height:30px; display:grid; place-items:center;
   border:1px solid var(--line); background: rgba(8,8,10,.7); }
 .dj__socials a:hover{ border-color: var(--red); color: var(--red); }

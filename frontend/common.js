@@ -10,6 +10,7 @@ window.B23 = (function () {
 
   var ICON = {
     instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>',
+    spotify: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.59 14.42a.63.63 0 0 1-.87.21 9.72 9.72 0 0 0-8.14-.89.63.63 0 0 1-.39-1.2 10.98 10.98 0 0 1 9.19 1 .63.63 0 0 1 .21.88Zm1.24-2.77a.8.8 0 0 1-1.1.26 12.1 12.1 0 0 0-10.02-1.08.8.8 0 0 1-.5-1.52 13.71 13.71 0 0 1 11.43 1.25.8.8 0 0 1 .19 1.09Zm.11-2.88C14.67 8.82 9.28 8.64 6.15 9.59a.96.96 0 1 1-.56-1.83c3.59-1.09 9.56-.88 13.3 1.35a.96.96 0 0 1-.95 1.66Z"/></svg>',
     soundcloud: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 14v4h1v-4H2zm2-1v5h1v-5H4zm2-1v6h1v-6H6zm2-2v8h1V10H8zm2-1.5V18h1V8.5h-1zM12 7v11h1V7h-1zm2.5 1c-.3 0-.6.05-.9.13V18H21a3 3 0 0 0 .2-6A4.5 4.5 0 0 0 14.5 8z"/></svg>',
     telegram: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.9 4.3 2.9 11.6c-1 .4-1 1.4-.1 1.7l4.7 1.5 1.8 5.6c.2.6.4.8.9.8.4 0 .6-.2.8-.5l2.4-2.4 4.9 3.6c.9.5 1.5.2 1.7-.8l3.1-14.6c.3-1.2-.5-1.8-1.9-1.2z"/></svg>',
     tiktok: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 3c.3 2.3 1.8 4 4 4.2V10c-1.5 0-2.9-.5-4-1.3v6.5A5.7 5.7 0 1 1 10.3 9.5v3a2.7 2.7 0 1 0 2.7 2.7V3H16z"/></svg>',

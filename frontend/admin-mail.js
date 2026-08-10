@@ -7,7 +7,7 @@ window.BARREL_registerMailPanel = function (api) {
   var savedListWidth = Number(localStorage.getItem('barrel23_mail_list_width'));
   var state = {
     accounts: [], accountId: null, folders: [], folder: 'INBOX', messages: [], selected: null,
-    loading: false, loadingOlder: false, error: '', messageCache: {}, messageTotal: 0, listScroll: {}, listWidth: savedListWidth >= 280 && savedListWidth <= 900 ? savedListWidth : 340
+    loading: false, loadingOlder: false, error: '', messageCache: {}, messageTotal: 0, listScroll: {}, search: '', searchTimer: null, listWidth: savedListWidth >= 280 && savedListWidth <= 900 ? savedListWidth : 340
   };
 
   function esc(value) {
@@ -33,7 +33,7 @@ window.BARREL_registerMailPanel = function (api) {
   }
 
   function mailboxScrollKey(accountId, folder) {
-    return (accountId || state.accountId || '') + ':' + (folder || state.folder || 'INBOX');
+    return (accountId || state.accountId || '') + ':' + (folder || state.folder || 'INBOX') + ':' + state.search;
   }
 
   function rememberListScroll() {
@@ -235,7 +235,7 @@ window.BARREL_registerMailPanel = function (api) {
     renderMailbox();
     var id = encodeURIComponent(state.accountId);
     var includeFolders = refreshFolders === true || !state.folders.length;
-    request('/api/mail/accounts/' + id + '/mailbox?folder=' + encodeURIComponent(state.folder) + '&include_folders=' + includeFolders).then(function (mailbox) {
+    request('/api/mail/accounts/' + id + '/mailbox?folder=' + encodeURIComponent(state.folder) + '&include_folders=' + includeFolders + '&search=' + encodeURIComponent(state.search)).then(function (mailbox) {
       if (mailbox.folders && mailbox.folders.length) state.folders = mailbox.folders;
       state.folder = mailbox.folder || state.folder;
       state.messages = mailbox.messages || [];
@@ -254,17 +254,18 @@ window.BARREL_registerMailPanel = function (api) {
     state.loadingOlder = true;
     var accountId = state.accountId;
     var folder = state.folder;
+    var searchQuery = state.search;
     var offset = state.messages.length;
     renderMailbox();
-    request('/api/mail/accounts/' + encodeURIComponent(accountId) + '/mailbox?folder=' + encodeURIComponent(folder) + '&include_folders=false&limit=50&offset=' + offset)
+    request('/api/mail/accounts/' + encodeURIComponent(accountId) + '/mailbox?folder=' + encodeURIComponent(folder) + '&include_folders=false&limit=50&offset=' + offset + '&search=' + encodeURIComponent(searchQuery))
       .then(function (mailbox) {
-        if (state.accountId !== accountId || state.folder !== folder) return;
+        if (state.accountId !== accountId || state.folder !== folder || state.search !== searchQuery) return;
         state.messages = state.messages.concat(mailbox.messages || []);
         state.messageTotal = Number(mailbox.message_total) || state.messages.length;
       }).catch(function (error) {
         if (state.accountId === accountId && state.folder === folder) toast(error.message);
       }).finally(function () {
-        if (state.accountId === accountId && state.folder === folder) {
+        if (state.accountId === accountId && state.folder === folder && state.search === searchQuery) {
           state.loadingOlder = false;
           renderMailbox();
         }
@@ -306,7 +307,7 @@ window.BARREL_registerMailPanel = function (api) {
       option.selected = item.id === state.accountId;
       select.appendChild(option);
     });
-    select.addEventListener('change', function () { rememberListScroll(); state.accountId = select.value; state.folders = []; state.messages = []; loadMailbox(true); });
+    select.addEventListener('change', function () { rememberListScroll(); state.accountId = select.value; state.folders = []; state.messages = []; state.search = ''; loadMailbox(true); });
     toolbar.appendChild(select);
     var test = el('button', 'btn btn--sm', 'TEST CONNECTION');
     test.disabled = state.loading;
@@ -318,6 +319,24 @@ window.BARREL_registerMailPanel = function (api) {
         .finally(function () { test.disabled = false; test.textContent = 'TEST CONNECTION'; });
     });
     toolbar.appendChild(test);
+    var search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'mail-search';
+    search.placeholder = 'SEARCH THIS FOLDER';
+    search.value = state.search;
+    search.setAttribute('aria-label', 'Search this mailbox folder');
+    search.addEventListener('input', function () {
+      window.clearTimeout(state.searchTimer);
+      state.searchTimer = window.setTimeout(function () {
+        var nextSearch = search.value.trim();
+        if (state.search !== nextSearch) {
+          rememberListScroll();
+          state.search = nextSearch;
+          loadMailbox(false);
+        }
+      }, 350);
+    });
+    toolbar.appendChild(search);
     var spacer = el('span', 'spacer'); toolbar.appendChild(spacer);
     var add = el('button', 'btn btn--primary btn--sm', '+ ADD MAILBOX');
     add.addEventListener('click', renderAccountForm);
@@ -348,14 +367,14 @@ window.BARREL_registerMailPanel = function (api) {
     var currentFolder = state.folders.filter(function (folder) { return folder.id === state.folder; })[0] || { label: 'Mailbox' };
     var loadedCount = state.messages.length;
     var totalLabel = state.messageTotal > loadedCount ? loadedCount + ' / ' + state.messageTotal : loadedCount;
-    listColumn.appendChild(el('div', 'mail-col__head', '<h3>' + esc(currentFolder.label) + '</h3><span class="cnt">' + (state.loading ? '...' : totalLabel + ' MSG') + '</span>'));
+    listColumn.appendChild(el('div', 'mail-col__head', '<h3>' + esc(state.search ? 'Search · ' + currentFolder.label : currentFolder.label) + '</h3><span class="cnt">' + (state.loading ? '...' : totalLabel + ' MSG') + '</span>'));
     var list = el('div', 'mail-col__scroll');
     var listKey = mailboxScrollKey();
     list.dataset.mailboxKey = listKey;
     list.addEventListener('scroll', function () { state.listScroll[listKey] = list.scrollTop; });
     if (state.loading) list.appendChild(el('div', 'mail-loading', 'LOADING MESSAGES'));
     else if (state.error) list.appendChild(el('div', 'mail-empty', esc(state.error)));
-    else if (!state.messages.length) list.appendChild(el('div', 'mail-empty', 'NO MESSAGES'));
+    else if (!state.messages.length) list.appendChild(el('div', 'mail-empty', state.search ? 'NO MATCHES' : 'NO MESSAGES'));
     else state.messages.forEach(function (message) {
       var counterparty = message.counterparty || message.from || {};
       var sender = counterparty.name || counterparty.email || 'Unknown sender';
@@ -433,6 +452,25 @@ window.BARREL_registerMailPanel = function (api) {
     var forward = el('button', 'btn', 'FORWARD');
     forward.addEventListener('click', function () { openCompose({ mode: 'forward', message: message }); });
     actions.appendChild(reply); actions.appendChild(forward);
+    if (state.folder.toLowerCase() === 'trash') {
+      var restore = el('button', 'btn btn--ghost', 'RESTORE TO INBOX');
+      restore.addEventListener('click', function () {
+        restore.disabled = true;
+        restore.textContent = 'RESTORING...';
+        request('/api/mail/accounts/' + encodeURIComponent(state.accountId) + '/messages/' + encodeURIComponent(message.id) + '/restore?folder=' + encodeURIComponent(state.folder), { method: 'POST' })
+          .then(function () {
+            delete state.messageCache[state.accountId + ':' + state.folder + ':' + message.id];
+            toast('MESSAGE RESTORED TO INBOX');
+            loadMailbox(false);
+          })
+          .catch(function (error) {
+            toast(error.message);
+            restore.disabled = false;
+            restore.textContent = 'RESTORE TO INBOX';
+          });
+      });
+      actions.appendChild(restore);
+    }
     var topbar = el('div', 'mail-reader__topbar');
     var back = el('button', 'btn btn--ghost btn--sm', 'BACK');
     back.addEventListener('click', function () { state.selected = null; renderMailbox(); });

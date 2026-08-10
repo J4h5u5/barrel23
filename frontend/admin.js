@@ -733,7 +733,7 @@
     socLabel.textContent = 'SOCIAL LINKS';
     box.appendChild(socLabel);
     var sg = el('div', 'grid cols-2');
-    ['instagram', 'soundcloud', 'telegram', 'tiktok', 'youtube'].forEach(function (k) {
+    ['instagram', 'spotify', 'soundcloud', 'telegram', 'tiktok', 'youtube'].forEach(function (k) {
       var sf = field(k.charAt(0).toUpperCase() + k.slice(1), '');
       sf._input.placeholder = 'URL…';
       sf._input.style.fontFamily = 'var(--mono)'; sf._input.style.fontSize = '12px';
@@ -952,7 +952,7 @@
         g.appendChild(f1); g.appendChild(f2); body.appendChild(g);
         var img = mediaField('Portrait', dj.image, 'image/*', function (v) { dj.image = v; }); img.style.marginTop = '16px'; body.appendChild(img);
         var g2 = el('div', 'grid cols-2'); g2.style.marginTop = '16px';
-        ['instagram', 'soundcloud', 'telegram', 'tiktok', 'youtube'].forEach(function (k) {
+        ['instagram', 'spotify', 'soundcloud', 'telegram', 'tiktok', 'youtube'].forEach(function (k) {
           var sf = field(k.charAt(0).toUpperCase() + k.slice(1) + ' URL', dj.socials[k] || '', { mono: true });
           bind(sf._input, dj.socials, k); g2.appendChild(sf);
         });
@@ -963,7 +963,7 @@
     render();
     makeSortable(list, C.djs, render);
     var add = el('button', 'btn btn--full', '+ ADD RESIDENT');
-    add.addEventListener('click', function () { C.djs.push({ name: 'NEW DJ', role: 'RESIDENT', image: '', socials: { instagram: '#', soundcloud: '#' } }); render(); setDirty(true); });
+    add.addEventListener('click', function () { C.djs.push({ name: 'NEW DJ', role: 'RESIDENT', image: '', socials: { instagram: '#', spotify: '#', soundcloud: '#' } }); render(); setDirty(true); });
     card.appendChild(list); card.appendChild(add);
     root.appendChild(card);
   };
