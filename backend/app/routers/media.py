@@ -2,9 +2,10 @@ import io
 import uuid
 import mimetypes
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageOps
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, Form
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 from ..database import get_db
 from ..auth import get_current_admin
 from ..config import settings
@@ -13,7 +14,7 @@ from .. import models
 router = APIRouter(prefix="/api/media", tags=["media"])
 
 ALLOWED = {
-    "images": {"image/jpeg", "image/png", "image/webp", "image/gif"},
+    "image":  {"image/jpeg", "image/png", "image/webp", "image/gif"},
     "audio":  {"audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/flac"},
     "video":  {"video/mp4", "video/webm", "video/ogg"},
 }
@@ -25,7 +26,9 @@ IMAGE_PRESETS = {
     "thumbnail": (600,  600),   # small previews
     "original":  (9999, 9999),  # no resize (logos etc.)
 }
-WEBP_QUALITY = 85
+WEBP_QUALITY = 84
+WEBP_METHOD = 4
+IMAGE_CATEGORIES = {"image", "images"}  # "images" is the legacy storage directory.
 
 
 def _detect_category(mime: str) -> str:
@@ -39,7 +42,7 @@ def _optimize_image(data: bytes, preset: str) -> tuple[bytes, str]:
     """Convert image to WebP and resize to fit within preset dimensions.
     Returns (optimized_bytes, 'webp')."""
     max_w, max_h = IMAGE_PRESETS.get(preset, IMAGE_PRESETS["gallery"])
-    img = Image.open(io.BytesIO(data))
+    img = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
 
     # Strip EXIF / convert color mode
     if img.mode not in ("RGB", "RGBA"):
@@ -56,7 +59,7 @@ def _optimize_image(data: bytes, preset: str) -> tuple[bytes, str]:
         img = bg
 
     buf = io.BytesIO()
-    img.save(buf, format="WEBP", quality=WEBP_QUALITY, method=6)
+    img.save(buf, format="WEBP", quality=WEBP_QUALITY, method=WEBP_METHOD)
     return buf.getvalue(), "webp"
 
 
@@ -90,14 +93,15 @@ async def upload_file(
     thumb_url = None
     if category == "image" and preset != "original":
         try:
-            content, ext = _optimize_image(raw, preset)
+            content, ext = await run_in_threadpool(_optimize_image, raw, preset)
             mime = "image/webp"
         except Exception as e:
             raise HTTPException(422, f"Image processing failed: {e}")
-        # Auto-create thumbnail when uploading gallery images
+        # Generate thumbnails from the already-resized gallery file. Re-decoding a
+        # 1400px WebP is much faster than processing the original camera image twice.
         if preset == "gallery":
             try:
-                thumb_content, thumb_ext = _optimize_image(raw, "thumbnail")
+                thumb_content, thumb_ext = await run_in_threadpool(_optimize_image, content, "thumbnail")
                 thumb_filename = _save_file(thumb_content, category, thumb_ext)
                 thumb_url = f"/uploads/{category}/{thumb_filename}"
             except Exception:
@@ -144,7 +148,7 @@ async def resize_existing(
     record = db.query(models.MediaFile).filter(models.MediaFile.id == file_id).first()
     if not record:
         raise HTTPException(404, "File not found")
-    if record.category != "images":
+    if record.category not in IMAGE_CATEGORIES:
         raise HTTPException(400, "Only images can be resized")
 
     path = Path(settings.uploads_dir) / record.category / record.filename
@@ -176,7 +180,7 @@ async def resize_existing(
         "url": f"/uploads/{record.category}/{new_filename}",
         "filename": new_filename,
         "original_name": record.original_name,
-        "category": record.category,
+        "category": "image",
         "size_bytes": len(optimized),
         "original_size_bytes": original_size,
         "saved_bytes": original_size - len(optimized),
@@ -191,7 +195,9 @@ def list_files(
     _=Depends(get_current_admin),
 ):
     q = db.query(models.MediaFile)
-    if category:
+    if category == "image":
+        q = q.filter(models.MediaFile.category.in_(IMAGE_CATEGORIES))
+    elif category:
         q = q.filter(models.MediaFile.category == category)
     files = q.order_by(models.MediaFile.uploaded_at.desc()).all()
     return [
@@ -200,7 +206,7 @@ def list_files(
             "url": f"/uploads/{f.category}/{f.filename}",
             "filename": f.filename,
             "original_name": f.original_name,
-            "category": f.category,
+            "category": "image" if f.category in IMAGE_CATEGORIES else f.category,
             "size_bytes": f.size_bytes,
             "uploaded_at": f.uploaded_at.isoformat() if f.uploaded_at else None,
         }

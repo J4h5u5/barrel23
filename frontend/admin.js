@@ -125,8 +125,14 @@
       xhr.setRequestHeader('Authorization', 'Bearer ' + getToken());
       if (onProgress) xhr.upload.onprogress = function (e) { if (e.lengthComputable) onProgress(e.loaded / e.total); };
       xhr.onload = function () {
-        if (xhr.status === 200) resolve(JSON.parse(xhr.responseText));
-        else reject(new Error('Upload failed: ' + xhr.status));
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch (error) { reject(new Error('Upload returned an invalid response')); }
+          return;
+        }
+        var detail = '';
+        try { detail = JSON.parse(xhr.responseText).detail || ''; } catch (error) {}
+        reject(new Error(detail || 'Upload failed: ' + xhr.status));
       };
       xhr.onerror = function () { reject(new Error('Upload error')); };
       xhr.send(fd);
@@ -811,18 +817,35 @@
     uploadBtn.addEventListener('click', function () { fileInp.click(); });
     fileInp.addEventListener('change', function () {
       var files = Array.prototype.slice.call(fileInp.files); if (!files.length) return;
-      var done = 0; var total = files.length;
+      var done = 0; var total = files.length; var succeeded = 0; var failed = [];
       var p = withProgress(uploadBtn, null);
-      files.forEach(function (file) {
-        uploadFile(file, 'gallery', function (pct) { p.progress((done + pct) / total); }).then(function (data) {
-          gallery.push({ url: data.url, thumb: data.thumb_url || data.url }); done++;
-          p.progress(done / total);
-          if (done === total) { p.done(); renderGrid(); setDirty(true); }
-        }).catch(function (e) {
-          done++; toast('UPLOAD FAILED: ' + e.message);
-          if (done === total) p.fail();
-        });
-      });
+      function uploadNext() {
+        if (done === total) {
+          fileInp.value = '';
+          renderGrid();
+          if (succeeded) setDirty(true);
+          progress.textContent = succeeded + '/' + total + ' UPLOADED' + (failed.length ? ' · ' + failed.length + ' FAILED' : '');
+          if (failed.length) {
+            p.fail();
+            toast('UPLOAD FAILED: ' + failed.join(', '));
+          } else p.done();
+          return;
+        }
+        var file = files[done];
+        progress.textContent = 'UPLOADING ' + (done + 1) + '/' + total + ' · ' + file.name;
+        uploadFile(file, 'gallery', function (pct) { p.progress((done + pct) / total); })
+          .then(function (data) {
+            gallery.push({ url: data.url, thumb: data.thumb_url || data.url });
+            succeeded++;
+          })
+          .catch(function (error) { failed.push(file.name + ' (' + error.message + ')'); })
+          .finally(function () {
+            done++;
+            p.progress(done / total);
+            uploadNext();
+          });
+      }
+      uploadNext();
     });
     uploadRow.appendChild(uploadBtn); uploadRow.appendChild(fileInp); uploadRow.appendChild(progress);
 
