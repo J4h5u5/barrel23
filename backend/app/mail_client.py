@@ -259,15 +259,15 @@ def _list_messages_from_client(
     status, _ = client.select(folder, readonly=True)
     if status != "OK":
         raise MailClientError("Could not open this mailbox folder")
-    if search:
-        # TEXT searches headers and message bodies. UTF-8 keeps non-English names
-        # and subjects searchable on IMAP servers that advertise UTF8=ACCEPT.
-        search_term = _imap_search_term(search)
-        status, data = client.uid("search", "UTF-8", "TEXT", search_term)
-        if status != "OK":
-            status, data = client.uid("search", None, "TEXT", search_term)
-    else:
-        status, data = client.uid("search", None, "ALL")
+    try:
+        if search:
+            # TEXT searches headers and message bodies. A quoted argument keeps
+            # spaces and IMAP control characters from changing the search syntax.
+            status, data = client.uid("search", None, "TEXT", _imap_search_term(search))
+        else:
+            status, data = client.uid("search", None, "ALL")
+    except imaplib.IMAP4.error as exc:
+        raise MailClientError("Could not search this mailbox folder") from exc
     if status != "OK" or not data:
         return [], 0
     all_uids = data[0].split()
