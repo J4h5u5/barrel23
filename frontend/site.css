@@ -265,6 +265,7 @@ button{ font-family: inherit; cursor: pointer; }
 .dj__scrim{ position:absolute; inset:0; background: linear-gradient(180deg, transparent 40%, rgba(8,8,10,.92)); }
 .dj__info{ position:absolute; left:14px; right:14px; bottom:14px; z-index:2; }
 .dj__role{ font-family:var(--mono); font-size:10px; letter-spacing:.3em; color: var(--red); }
+.dj__played{ font-family:var(--mono); font-size:9px; letter-spacing:.18em; color:var(--ink-dim); margin-top:5px; }
 .dj__name{ font-family: var(--display); font-size: 26px; line-height:1; margin-top:4px; }
 .dj__socials{ display:flex; gap:10px; margin-top:10px; }
 .dj__socials a{ width:30px; height:30px; display:grid; place-items:center;
@@ -398,6 +399,7 @@ button{ font-family: inherit; cursor: pointer; }
 
   /* ── DJ cards: bigger on mobile ── */
   .dj__role{ font-size: 12px; letter-spacing:.25em; }
+  .dj__played{ font-size: 10px; }
   .dj__name{ font-size: 34px; }
   .dj__socials a{ width: 40px; height: 40px; }
   .dj__socials svg{ width: 18px; height: 18px; }

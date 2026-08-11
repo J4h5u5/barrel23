@@ -65,7 +65,7 @@ DEFAULT_CONTENT = {
     },
     "contacts": {
         "email": "info@barrel23.rave",
-        "bookings": "bookings@barrel23.rave"
+        "bookings": "agent@barrel23.com"
     },
     "socials": {
         "instagram": "#",

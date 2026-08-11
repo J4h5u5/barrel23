@@ -109,8 +109,24 @@
       body: JSON.stringify(C)
     }).then(function (r) {
       if (r.status === 401) { clearToken(); showLogin('Session expired.'); throw new Error('401'); }
-      if (!r.ok) throw new Error('Save failed');
-      return r.json();
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (!r.ok) throw new Error(data.detail || 'Save failed');
+        return data;
+      });
+    });
+  }
+
+  function saveAnnouncement() {
+    return apiFetch('/api/content', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ announce: C.announce })
+    }).then(function (r) {
+      if (r.status === 401) { clearToken(); showLogin('Session expired.'); throw new Error('401'); }
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (!r.ok) throw new Error(data.detail || 'Save failed');
+        return data;
+      });
     });
   }
 
@@ -386,6 +402,11 @@
     a.lineupLabel = ''; a.lineup = []; a.ticketLabel = ''; a.ticketUrl = ''; a.images = [];
   }
 
+  function replaceObject(target, source) {
+    Object.keys(target).forEach(function (key) { delete target[key]; });
+    Object.keys(source).forEach(function (key) { target[key] = source[key]; });
+  }
+
   function openArchiveModal(a) {
     var overlay = el('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
@@ -503,9 +524,21 @@
     deleteBtn.disabled = !a.announced;
     deleteBtn.addEventListener('click', function () {
       if (!window.confirm('Delete the current event without adding it to Past Events? Uploaded media will remain in Media Library.')) return;
+      var previous = JSON.parse(JSON.stringify(a));
+      var wasDirty = dirty;
       resetCurrentAnnouncement(a);
-      setDirty(true);
-      route('announce');
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'DELETING...';
+      saveAnnouncement().then(function () {
+        setDirty(wasDirty);
+        toast('CURRENT EVENT DELETED');
+        route('announce');
+      }).catch(function (error) {
+        replaceObject(a, previous);
+        setDirty(true);
+        toast('DELETE FAILED: ' + error.message);
+        route('announce');
+      });
     });
     archActions.appendChild(archBtn); archActions.appendChild(deleteBtn);
     archCard.appendChild(archActions);
@@ -736,12 +769,14 @@
     box.style.cssText = 'background:#111;border:1px solid #333;padding:32px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;font-family:var(--mono)';
     box.innerHTML = '<div style="color:var(--red);font-size:11px;letter-spacing:3px;margin-bottom:20px">NEW DJ / ARTIST</div>';
 
-    var dj = { name: '', role: 'GUEST', image: '', socials: {} };
+    var dj = { name: '', role: 'GUEST', playedDate: '', image: '', socials: {} };
 
     var g = el('div', 'grid cols-2');
     var fn = field('Name', ''); fn._input.addEventListener('input', function () { dj.name = fn._input.value; });
     var fr = field('Role / Status', 'GUEST'); fr._input.addEventListener('input', function () { dj.role = fr._input.value; }); dj.role = 'GUEST';
-    g.appendChild(fn); g.appendChild(fr);
+    var fd = field('Played date (guest artist)', '', { type: 'date', hint: 'Optional. Shown publicly for visiting artists.' });
+    fd._input.addEventListener('input', function () { dj.playedDate = fd._input.value; });
+    g.appendChild(fn); g.appendChild(fr); g.appendChild(fd);
     box.appendChild(g);
 
     var imgF = mediaField('Photo', '', 'image/*', function (v) { dj.image = v; }, 'portrait');
@@ -985,7 +1020,8 @@
         var g = el('div', 'grid cols-2');
         var f1 = field('Name', dj.name); bind(f1._input, dj, 'name');
         var f2 = field('Role', dj.role); bind(f2._input, dj, 'role');
-        g.appendChild(f1); g.appendChild(f2); body.appendChild(g);
+        var f3 = field('Played date (guest artist)', dj.playedDate || '', { type: 'date', hint: 'Optional. Shown publicly for visiting artists.' }); bind(f3._input, dj, 'playedDate');
+        g.appendChild(f1); g.appendChild(f2); g.appendChild(f3); body.appendChild(g);
         var img = mediaField('Portrait', dj.image, 'image/*', function (v) { dj.image = v; }); img.style.marginTop = '16px'; body.appendChild(img);
         var g2 = el('div', 'grid cols-2'); g2.style.marginTop = '16px';
         ['instagram', 'spotify', 'soundcloud', 'telegram', 'tiktok', 'youtube'].forEach(function (k) {
@@ -999,7 +1035,7 @@
     render();
     makeSortable(list, C.djs, render);
     var add = el('button', 'btn btn--full', '+ ADD RESIDENT');
-    add.addEventListener('click', function () { C.djs.push({ name: 'NEW DJ', role: 'RESIDENT', image: '', socials: { instagram: '#', spotify: '#', soundcloud: '#' } }); render(); setDirty(true); });
+    add.addEventListener('click', function () { C.djs.push({ name: 'NEW DJ', role: 'RESIDENT', playedDate: '', image: '', socials: { instagram: '#', spotify: '#', soundcloud: '#' } }); render(); setDirty(true); });
     card.appendChild(list); card.appendChild(add);
     root.appendChild(card);
   };

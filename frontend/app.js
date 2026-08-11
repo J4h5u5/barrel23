@@ -4,6 +4,13 @@
 (function () {
   var $ = B23.$, $$ = B23.$$, esc = B23.esc, pad = B23.pad, socialLinks = B23.socialLinks;
 
+  function formatPlayedDate(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return '';
+    var parts = value.split('-');
+    var date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+  }
+
 
   function init(C) {
     var announced = !(C.announce && C.announce.announced === false);
@@ -170,11 +177,13 @@
 
     /* ===== DJs ===== */
     $('#djs').innerHTML = C.djs.map(function (dj) {
+      var playedDate = formatPlayedDate(dj.playedDate);
       return '<article class="dj reveal">' +
         '<img src="' + esc(dj.image) + '" alt="' + esc(dj.name) + '" loading="lazy">' +
         '<div class="dj__scrim"></div>' +
         '<div class="dj__info">' +
           '<div class="dj__role">' + esc(dj.role || 'ARTIST') + '</div>' +
+          (playedDate ? '<div class="dj__played">PLAYED ' + esc(playedDate) + '</div>' : '') +
           '<div class="dj__name">' + esc(dj.name) + '</div>' +
           '<div class="dj__socials">' + socialLinks(dj.socials || {}) + '</div>' +
         '</div></article>';
