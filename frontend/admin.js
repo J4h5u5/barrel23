@@ -380,6 +380,12 @@
     root.appendChild(vcard);
   };
 
+  function resetCurrentAnnouncement(a) {
+    a.announced = false;
+    a.kicker = ''; a.eventName = ''; a.date = ''; a.doors = ''; a.city = ''; a.venue = ''; a.blurb = '';
+    a.lineupLabel = ''; a.lineup = []; a.ticketLabel = ''; a.ticketUrl = ''; a.images = [];
+  }
+
   function openArchiveModal(a) {
     var overlay = el('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px';
@@ -469,10 +475,8 @@
         lineup: luData
       };
       C.pastEvents.unshift(entry);
-      /* reset next event to TBA */
-      a.announced = false;
-      a.eventName = ''; a.date = ''; a.doors = ''; a.city = ''; a.venue = ''; a.blurb = '';
-      a.lineup = []; a.images = [];
+      /* Reset the editor after preserving the completed event in the archive. */
+      resetCurrentAnnouncement(a);
       document.body.removeChild(overlay);
       setDirty(true);
       setTimeout(function () { route('announce'); }, 0);
@@ -492,10 +496,19 @@
     /* archive action card */
     var archCard = el('div', 'card');
     archCard.innerHTML = '<div class="kick">ARCHIVE</div><div class="card__head"><div><h2>Archive current event</h2><p>Saves the current event to the top of Past Events and resets Next Event to TBA state.</p></div></div>';
+    var archActions = el('div'); archActions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:16px';
     var archBtn = el('button', 'btn', '⬇ MOVE TO ARCHIVE');
-    archBtn.style.marginTop = '16px';
     archBtn.addEventListener('click', function () { openArchiveModal(a); });
-    archCard.appendChild(archBtn);
+    var deleteBtn = el('button', 'btn btn--danger', 'DELETE CURRENT EVENT');
+    deleteBtn.disabled = !a.announced;
+    deleteBtn.addEventListener('click', function () {
+      if (!window.confirm('Delete the current event without adding it to Past Events? Uploaded media will remain in Media Library.')) return;
+      resetCurrentAnnouncement(a);
+      setDirty(true);
+      route('announce');
+    });
+    archActions.appendChild(archBtn); archActions.appendChild(deleteBtn);
+    archCard.appendChild(archActions);
     root.appendChild(archCard);
 
     /* status toggle card */
