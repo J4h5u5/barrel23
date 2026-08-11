@@ -144,6 +144,20 @@
     });
   }
 
+  function saveSets(sets) {
+    return apiFetch('/api/content/sets', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sets: sets })
+    }).then(function (r) {
+      if (r.status === 401) { clearToken(); showLogin('Session expired.'); throw new Error('401'); }
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (!r.ok) throw new Error(data.detail || 'Save failed');
+        return data;
+      });
+    });
+  }
+
   function uploadFile(file, preset, onProgress) {
     preset = preset || 'gallery';
     var fd = new FormData();
@@ -975,13 +989,18 @@
 
   function makeSortable(listEl, arr, onReorder) {
     var dragged = null;
+    var reordered = false;
+    var dirtyBeforeDrag = false;
     listEl.addEventListener('dragstart', function (e) {
       dragged = e.target.closest('.item');
+      reordered = false;
+      dirtyBeforeDrag = dirty;
       if (dragged) { setTimeout(function () { dragged.style.opacity = '.4'; }, 0); }
     });
     listEl.addEventListener('dragend', function () {
       if (dragged) { dragged.style.opacity = ''; dragged = null; }
       listEl.querySelectorAll('.item').forEach(function (el) { el.classList.remove('drag-over'); });
+      if (reordered && typeof onReorder === 'function') onReorder(dirtyBeforeDrag);
     });
     listEl.addEventListener('dragover', function (e) {
       e.preventDefault();
@@ -995,6 +1014,7 @@
       if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
       var moved = arr.splice(fromIdx, 1)[0];
       arr.splice(toIdx, 0, moved);
+      reordered = true;
       if (fromIdx < toIdx) listEl.insertBefore(dragged, target.nextSibling);
       else listEl.insertBefore(dragged, target);
       setDirty(true);
@@ -1220,7 +1240,15 @@
       });
     }
     render();
-    makeSortable(list, C.sets, render);
+    makeSortable(list, C.sets, function (wasDirty) {
+      saveSets(C.sets).then(function () {
+        setDirty(wasDirty);
+        toast('SET ORDER SAVED');
+      }).catch(function (error) {
+        setDirty(true);
+        toast('SET ORDER SAVE FAILED: ' + error.message);
+      });
+    });
     var add = el('button', 'btn btn--full', '+ ADD SET');
     add.addEventListener('click', function () { C.sets.push({ title: 'NEW SET', dj: '', event: '', duration: 3600, audioUrl: '' }); render(); setDirty(true); });
     card.appendChild(list); card.appendChild(add);
