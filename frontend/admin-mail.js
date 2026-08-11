@@ -7,7 +7,7 @@ window.BARREL_registerMailPanel = function (api) {
   var savedListWidth = Number(localStorage.getItem('barrel23_mail_list_width'));
   var state = {
     accounts: [], accountId: null, folders: [], folder: 'INBOX', messages: [], selected: null,
-    loading: false, loadingOlder: false, error: '', messageCache: {}, messageTotal: 0, listScroll: {}, search: '', searchTimer: null, listWidth: savedListWidth >= 280 && savedListWidth <= 900 ? savedListWidth : 340
+    loading: false, loadingOlder: false, error: '', messageCache: {}, messageTotal: 0, listScroll: {}, search: '', searchTimer: null, accountMenuClose: null, listWidth: savedListWidth >= 280 && savedListWidth <= 900 ? savedListWidth : 340
   };
 
   function esc(value) {
@@ -326,20 +326,58 @@ window.BARREL_registerMailPanel = function (api) {
   function renderMailbox() {
     var active = account();
     if (!active) { renderNoMailbox(); return; }
+    if (state.accountMenuClose) state.accountMenuClose();
     rememberListScroll();
     rootEl.innerHTML = '';
     var toolbar = el('div', 'mail-toolbar');
-    var select = el('select', 'mail-select');
+    var switcher = el('div', 'mail-switcher');
+    var trigger = el('button', 'mail-switcher__trigger');
+    trigger.type = 'button';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.innerHTML = '<span class="mail-switcher__identity"><b>' + esc(active.display_name) + '</b><span>' + esc(active.email) + (active.is_default ? ' · DEFAULT' : '') + '</span></span><span class="mail-switcher__chevron" aria-hidden="true"></span>';
+    var menu = el('div', 'mail-switcher__menu');
+    menu.setAttribute('role', 'listbox');
     state.accounts.forEach(function (item) {
-      var option = el('option');
-      option.value = item.id;
-      option.textContent = item.display_name + ' <' + item.email + '>' + (item.is_default ? ' (DEFAULT)' : '') + (item.broken ? ' (UNAVAILABLE)' : '');
+      var option = el('button', 'mail-switcher__option' + (item.id === state.accountId ? ' active' : '') + (item.broken ? ' broken' : ''));
+      option.type = 'button';
       option.disabled = !!item.broken;
-      option.selected = item.id === state.accountId;
-      select.appendChild(option);
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', item.id === state.accountId ? 'true' : 'false');
+      option.innerHTML = '<span><b>' + esc(item.display_name) + '</b><small>' + esc(item.email) + '</small></span><em>' + (item.broken ? 'UNAVAILABLE' : item.is_default ? 'DEFAULT' : item.id === state.accountId ? 'ACTIVE' : '') + '</em>';
+      option.addEventListener('click', function () {
+        if (item.id === state.accountId || item.broken) return;
+        rememberListScroll();
+        state.accountId = item.id;
+        state.folders = [];
+        state.messages = [];
+        state.search = '';
+        loadMailbox(true);
+      });
+      menu.appendChild(option);
     });
-    select.addEventListener('change', function () { rememberListScroll(); state.accountId = select.value; state.folders = []; state.messages = []; state.search = ''; loadMailbox(true); });
-    toolbar.appendChild(select);
+    function closeMenu() {
+      switcher.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('pointerdown', closeOnOutside);
+      state.accountMenuClose = null;
+    }
+    function closeOnOutside(event) {
+      if (!switcher.contains(event.target)) closeMenu();
+    }
+    trigger.addEventListener('click', function () {
+      if (switcher.classList.contains('open')) {
+        closeMenu();
+      } else {
+        switcher.classList.add('open');
+        trigger.setAttribute('aria-expanded', 'true');
+        state.accountMenuClose = closeMenu;
+        window.setTimeout(function () { document.addEventListener('pointerdown', closeOnOutside); }, 0);
+      }
+    });
+    switcher.appendChild(trigger);
+    switcher.appendChild(menu);
+    toolbar.appendChild(switcher);
     var test = el('button', 'btn btn--sm', 'TEST CONNECTION');
     test.disabled = state.loading;
     test.addEventListener('click', function () {
@@ -410,19 +448,20 @@ window.BARREL_registerMailPanel = function (api) {
     else state.messages.forEach(function (message) {
       var counterparty = message.counterparty || message.from || {};
       var sender = counterparty.name || counterparty.email || 'Unknown sender';
-      var button = el('div', 'mail-msg' + (message.unread ? ' unread' : '') + (state.selected && state.selected.id === message.id ? ' active' : ''),
-        '<div class="mail-msg__top"><span class="mail-msg__from">' + esc(sender) + '</span><span class="mail-msg__time">' + esc(relTime(message.date)) + '</span></div><div class="mail-msg__subject">' + esc(message.subject) + '</div><div class="mail-msg__to">' + esc(counterparty.email || '') + '</div>');
-      button.setAttribute('role', 'button');
-      button.tabIndex = 0;
-      button.addEventListener('click', function () { readMessage(message); });
-      button.addEventListener('keydown', function (event) { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); readMessage(message); } });
-      var star = el('button', 'mail-msg__star' + (message.starred ? ' is-starred' : ''), message.starred ? '★' : '☆');
+      var row = el('article', 'mail-msg' + (message.unread ? ' unread' : '') + (state.selected && state.selected.id === message.id ? ' active' : ''));
+      var star = el('button', 'mail-msg__star' + (message.starred ? ' is-starred' : ''), '★');
       star.type = 'button';
       star.title = message.starred ? 'Remove from Starred' : 'Add to Starred';
       star.setAttribute('aria-label', star.title);
+      star.setAttribute('aria-pressed', message.starred ? 'true' : 'false');
       star.addEventListener('click', function (event) { event.stopPropagation(); toggleStar(message); });
-      button.querySelector('.mail-msg__top').insertBefore(star, button.querySelector('.mail-msg__time'));
-      list.appendChild(button);
+      var open = el('button', 'mail-msg__open',
+        '<span class="mail-msg__top"><span class="mail-msg__from">' + esc(sender) + '</span><span class="mail-msg__time">' + esc(relTime(message.date)) + '</span></span><span class="mail-msg__subject">' + esc(message.subject) + '</span><span class="mail-msg__to">' + esc(counterparty.email || '') + '</span>');
+      open.type = 'button';
+      open.addEventListener('click', function () { readMessage(message); });
+      row.appendChild(star);
+      row.appendChild(open);
+      list.appendChild(row);
     });
     if (!state.loading && !state.error && state.messages.length && state.messages.length < state.messageTotal) {
       var older = el('button', 'btn btn--ghost btn--sm mail-load-older', state.loadingOlder ? 'LOADING...' : 'LOAD 50 OLDER');
@@ -488,7 +527,11 @@ window.BARREL_registerMailPanel = function (api) {
     }
     var wrap = el('div', 'mail-reader');
     var actions = el('div', 'mail-reader__actions');
-    var star = el('button', 'btn btn--star' + (message.starred ? ' is-starred' : ''), message.starred ? '★ STARRED' : '☆ STAR');
+    var star = el('button', 'mail-reader__star' + (message.starred ? ' is-starred' : ''), '★');
+    star.type = 'button';
+    star.title = message.starred ? 'Remove from Starred' : 'Add to Starred';
+    star.setAttribute('aria-label', star.title);
+    star.setAttribute('aria-pressed', message.starred ? 'true' : 'false');
     star.addEventListener('click', function () { toggleStar(message); });
     var reply = el('button', 'btn btn--primary', 'REPLY');
     reply.addEventListener('click', function () { openCompose({ mode: 'reply', message: message }); });
