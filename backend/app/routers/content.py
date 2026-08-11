@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..auth import get_current_admin
@@ -7,6 +8,13 @@ from ..default_content import DEFAULT_CONTENT
 import copy
 
 router = APIRouter(prefix="/api/content", tags=["content"])
+
+
+class AnnouncementState(BaseModel):
+    """Persist the public visibility switch without overwriting editor drafts."""
+
+    announced: bool
+    visible: bool
 
 
 def _get_or_create(db: Session) -> models.SiteContent:
@@ -32,3 +40,16 @@ def update_content(payload: dict, db: Session = Depends(get_db), _=Depends(get_c
     row.data = merged
     db.commit()
     return merged
+
+
+@router.patch("/announce-state")
+def update_announcement_state(payload: AnnouncementState, db: Session = Depends(get_db), _=Depends(get_current_admin)):
+    row = _get_or_create(db)
+    data = copy.deepcopy(row.data)
+    announcement = dict(data.get("announce") or {})
+    announcement["announced"] = payload.announced
+    announcement["visible"] = payload.visible
+    data["announce"] = announcement
+    row.data = data
+    db.commit()
+    return {"announced": announcement["announced"], "visible": announcement["visible"]}

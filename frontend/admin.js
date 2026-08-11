@@ -130,6 +130,20 @@
     });
   }
 
+  function saveAnnouncementState(announced, visible) {
+    return apiFetch('/api/content/announce-state', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ announced: announced, visible: visible })
+    }).then(function (r) {
+      if (r.status === 401) { clearToken(); showLogin('Session expired.'); throw new Error('401'); }
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        if (!r.ok) throw new Error(data.detail || 'Save failed');
+        return data;
+      });
+    });
+  }
+
   function uploadFile(file, preset, onProgress) {
     preset = preset || 'gallery';
     var fd = new FormData();
@@ -563,6 +577,8 @@
     /* status toggle card */
     var statusCard = el('div', 'card');
     statusCard.innerHTML = '<div class="kick">BLOCK 01 + 02</div><div class="card__head"><div><h2>Next event status</h2><p>Use <b>Date TBA</b> to show the placeholder, or hide Block 02 completely while keeping the Hero signal visible.</p></div></div>';
+    var statusReadout = el('div', 'event-visibility-status');
+    statusCard.appendChild(statusReadout);
     var segWrap = el('div'); segWrap.style.cssText = 'display:flex;gap:8px;margin:16px 0 0';
     var segOn = el('button', 'btn btn--sm', 'ANNOUNCED');
     var segOff = el('button', 'btn btn--sm', '◌ DATE TBA');
@@ -652,17 +668,46 @@
     root.appendChild(tcard);
 
     var liveCards = [card, lcard, icard];
+    var statusButtons = [segOn, segOff, segHide];
+    var stateSaving = false;
     function applyState() {
       segOn.classList.toggle('on', a.visible && !!a.announced);
       segOff.classList.toggle('on', a.visible && !a.announced);
       segHide.classList.toggle('on', !a.visible);
+      statusReadout.className = 'event-visibility-status' + (a.visible ? ' is-visible' : ' is-hidden');
+      statusReadout.textContent = a.visible
+        ? (a.announced ? 'BLOCK 02 IS VISIBLE: ANNOUNCED EVENT' : 'BLOCK 02 IS VISIBLE: DATE TBA')
+        : 'BLOCK 02 IS HIDDEN FROM THE PUBLIC SITE';
+      statusButtons.forEach(function (button) { button.disabled = stateSaving; });
       liveCards.forEach(function (c) { c.style.opacity = a.announced ? '' : '0.4'; c.style.pointerEvents = a.announced ? '' : 'none'; });
       tcard.style.opacity = a.announced ? '0.4' : '';
       tcard.style.pointerEvents = a.announced ? 'none' : '';
     }
-    segOn.addEventListener('click', function () { a.visible = true; a.announced = true; setDirty(true); applyState(); });
-    segOff.addEventListener('click', function () { a.visible = true; a.announced = false; setDirty(true); applyState(); });
-    segHide.addEventListener('click', function () { a.visible = false; setDirty(true); applyState(); });
+    function updateAnnouncementState(announced, visible) {
+      if (stateSaving || (a.announced === announced && a.visible === visible)) return;
+      var previous = { announced: a.announced, visible: a.visible };
+      var wasDirty = dirty;
+      a.announced = announced;
+      a.visible = visible;
+      stateSaving = true;
+      applyState();
+      saveAnnouncementState(announced, visible).then(function () {
+        stateSaving = false;
+        setDirty(wasDirty);
+        applyState();
+        toast(visible ? (announced ? 'BLOCK 02 SHOWN: ANNOUNCED' : 'BLOCK 02 SHOWN: DATE TBA') : 'BLOCK 02 HIDDEN');
+      }).catch(function (error) {
+        a.announced = previous.announced;
+        a.visible = previous.visible;
+        stateSaving = false;
+        setDirty(wasDirty);
+        applyState();
+        toast('STATUS SAVE FAILED: ' + error.message);
+      });
+    }
+    segOn.addEventListener('click', function () { updateAnnouncementState(true, true); });
+    segOff.addEventListener('click', function () { updateAnnouncementState(false, true); });
+    segHide.addEventListener('click', function () { updateAnnouncementState(a.announced, false); });
     applyState();
   };
 

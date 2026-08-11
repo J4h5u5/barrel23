@@ -40,6 +40,10 @@ window.BARREL_registerMailPanel = function (api) {
     return summary;
   }
 
+  function waveformStar() {
+    return '<svg class="mail-star-wave" viewBox="0 0 26 26" aria-hidden="true"><path class="mail-star-wave__brackets" d="M2 8V2h6M18 2h6v6M24 18v6h-6M8 24H2v-6"></path><path class="mail-star-wave__pulse" d="M3 13h3l2.5-8 3.5 16 3.5-11 2 3h5.5"></path><path class="mail-star-wave__core" d="M6 13h2l2.2-6 3 12 3-8.5 1.6 2.5H20"></path></svg>';
+  }
+
   function toggleStar(message) {
     var previous = !!message.starred;
     var next = !previous;
@@ -449,7 +453,7 @@ window.BARREL_registerMailPanel = function (api) {
       var counterparty = message.counterparty || message.from || {};
       var sender = counterparty.name || counterparty.email || 'Unknown sender';
       var row = el('article', 'mail-msg' + (message.unread ? ' unread' : '') + (state.selected && state.selected.id === message.id ? ' active' : ''));
-      var star = el('button', 'mail-msg__star' + (message.starred ? ' is-starred' : ''), '★');
+      var star = el('button', 'mail-msg__star' + (message.starred ? ' is-starred' : ''), waveformStar());
       star.type = 'button';
       star.title = message.starred ? 'Remove from Starred' : 'Add to Starred';
       star.setAttribute('aria-label', star.title);
@@ -527,7 +531,7 @@ window.BARREL_registerMailPanel = function (api) {
     }
     var wrap = el('div', 'mail-reader');
     var actions = el('div', 'mail-reader__actions');
-    var star = el('button', 'mail-reader__star' + (message.starred ? ' is-starred' : ''), '★');
+    var star = el('button', 'mail-reader__star' + (message.starred ? ' is-starred' : ''), waveformStar());
     star.type = 'button';
     star.title = message.starred ? 'Remove from Starred' : 'Add to Starred';
     star.setAttribute('aria-label', star.title);

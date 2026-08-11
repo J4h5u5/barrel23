@@ -110,6 +110,7 @@ img{ display:block; max-width:100%; }
 .btn--primary:hover{ filter:brightness(1.08); }
 .btn--ghost{ background:transparent; }
 .btn--sm{ padding:8px 12px; font-size:11px; }
+.event-visibility-status{margin-top:16px;padding:10px 12px;border:1px solid var(--line);background:var(--field);color:var(--ink-mute);font-family:var(--mono);font-size:10px;letter-spacing:.12em}.event-visibility-status:before{content:"";display:inline-block;width:7px;height:7px;margin:0 8px 1px 0;border-radius:50%;background:currentColor}.event-visibility-status.is-visible{color:var(--green)}.event-visibility-status.is-hidden{color:var(--red)}
 .btn--danger{ color:var(--red); border-color:var(--red-2); background:transparent; }
 .btn--danger:hover{ background:rgba(255,36,23,.1); }
 .btn .ic{ width:14px; height:14px; }
