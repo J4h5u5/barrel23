@@ -77,7 +77,11 @@
       if (sigEl) {
         sigEl.hidden = false;
         var sl = $('#hero-signal-label'), ss = $('#hero-signal-status');
-        if (sl) sl.textContent = C.announce.kicker || 'NEXT TRANSMISSION';
+        if (sl) {
+          var signalLabel = C.announce.visible === false ? '' : (C.announce.kicker || 'NEXT TRANSMISSION');
+          sl.textContent = signalLabel;
+          sl.hidden = !signalLabel;
+        }
         if (ss) ss.textContent = C.hero.tbaStatus || 'DATE TO BE REVEALED';
       }
     }
