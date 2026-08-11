@@ -61,6 +61,11 @@ class MailAccountCreate(BaseModel):
         return value
 
 
+class MailStarCreate(BaseModel):
+    source_folder: str = Field(min_length=1, max_length=255)
+    message: dict = Field(default_factory=dict)
+
+
 def _metadata(account_id: str, config: MailboxConfig, is_default: bool) -> dict:
     return {
         "id": account_id,
@@ -113,6 +118,55 @@ def _get_mailbox(db: Session, account_id: str) -> tuple[MailboxConfig, bool]:
 
 def _mail_failure(exc: MailClientError) -> HTTPException:
     return HTTPException(502, str(exc))
+
+
+def _star_account_key(account_id: str) -> str:
+    return account_id
+
+
+def _with_starred_folder(folders: list[dict]) -> list[dict]:
+    if any(item.get("id", "").lower() == "starred" for item in folders):
+        return folders
+    result = list(folders)
+    inbox_index = next((index for index, item in enumerate(result) if item.get("id", "").lower() == "inbox"), -1)
+    result.insert(inbox_index + 1 if inbox_index >= 0 else 0, {"id": "STARRED", "label": "Starred"})
+    return result
+
+
+def _starred_mailbox(db: Session, account_key: str, search: str, limit: int, offset: int) -> dict:
+    rows = db.query(models.MailStar).filter(models.MailStar.account_key == account_key).order_by(models.MailStar.created_at.desc()).all()
+    query = search.strip().lower()
+    if query:
+        rows = [
+            row for row in rows
+            if query in " ".join(
+                str((row.message_data or {}).get(key, ""))
+                for key in ("subject", "to", "date", "from", "counterparty")
+            ).lower()
+        ]
+    selected = rows[offset:offset + limit]
+    messages = []
+    for row in selected:
+        message = dict(row.message_data or {})
+        message["id"] = row.message_id
+        message["starred"] = True
+        message["source_folder"] = row.source_folder
+        messages.append(message)
+    return {"folders": [], "folder": "STARRED", "messages": messages, "message_total": len(rows)}
+
+
+def _apply_star_flags(db: Session, account_key: str, folder: str, messages: list[dict]) -> None:
+    if not messages:
+        return
+    starred_ids = {
+        row.message_id
+        for row in db.query(models.MailStar.message_id).filter(
+            models.MailStar.account_key == account_key,
+            models.MailStar.source_folder == folder,
+        ).all()
+    }
+    for message in messages:
+        message["starred"] = str(message.get("id", "")) in starred_ids
 
 
 @router.get("/accounts")
@@ -195,8 +249,14 @@ def get_mailbox(
     _=Depends(get_current_admin),
 ):
     config, _ = _get_mailbox(db, account_id)
+    if folder.lower() == "starred":
+        return _starred_mailbox(db, _star_account_key(account_id), search, limit, offset)
     try:
-        return load_mailbox(config, folder, limit, include_folders, offset, search)
+        mailbox = load_mailbox(config, folder, limit, include_folders, offset, search)
+        _apply_star_flags(db, _star_account_key(account_id), folder, mailbox.get("messages", []))
+        if mailbox.get("folders"):
+            mailbox["folders"] = _with_starred_folder(mailbox["folders"])
+        return mailbox
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
 
@@ -206,14 +266,93 @@ def read_message(
     account_id: str,
     message_id: str,
     folder: str = Query("INBOX", min_length=1, max_length=255),
+    source_folder_query: str = Query("", alias="source_folder", max_length=255),
     db: Session = Depends(get_db),
     _=Depends(get_current_admin),
 ):
     config, _ = _get_mailbox(db, account_id)
+    message_folder = folder
+    star = None
+    if folder.lower() == "starred":
+        star_query = db.query(models.MailStar).filter(
+            models.MailStar.account_key == _star_account_key(account_id),
+            models.MailStar.message_id == message_id,
+        )
+        if source_folder_query:
+            star_query = star_query.filter(models.MailStar.source_folder == source_folder_query)
+        star = star_query.first()
+        if not star:
+            raise HTTPException(404, "Starred message not found")
+        message_folder = star.source_folder
     try:
-        return get_message(config, folder, message_id)
+        message = get_message(config, message_folder, message_id)
+        if star:
+            message["starred"] = True
+            message["source_folder"] = message_folder
+        return message
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
+
+
+@router.post("/accounts/{account_id}/messages/{message_id}/star")
+def star_message(
+    account_id: str,
+    message_id: str,
+    payload: MailStarCreate,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    if payload.source_folder.lower() == "starred":
+        raise HTTPException(400, "A starred message needs an IMAP source folder")
+    config, _ = _get_mailbox(db, account_id)
+    # Verify the UID and keep only the summary data needed for the virtual folder.
+    try:
+        message = get_message(config, payload.source_folder, message_id)
+    except MailClientError as exc:
+        raise _mail_failure(exc) from exc
+    summary = {
+        key: message.get(key)
+        for key in ("id", "from", "counterparty", "to", "subject", "date", "unread")
+        if key in message
+    }
+    row = db.query(models.MailStar).filter(
+        models.MailStar.account_key == _star_account_key(account_id),
+        models.MailStar.source_folder == payload.source_folder,
+        models.MailStar.message_id == message_id,
+    ).first()
+    if row:
+        row.source_folder = payload.source_folder
+        row.message_data = summary
+    else:
+        db.add(models.MailStar(
+            account_key=_star_account_key(account_id),
+            message_id=message_id,
+            source_folder=payload.source_folder,
+            message_data=summary,
+        ))
+    db.commit()
+    return {"ok": True, "starred": True}
+
+
+@router.delete("/accounts/{account_id}/messages/{message_id}/star")
+def unstar_message(
+    account_id: str,
+    message_id: str,
+    source_folder: str = Query("", max_length=255),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    star_query = db.query(models.MailStar).filter(
+        models.MailStar.account_key == _star_account_key(account_id),
+        models.MailStar.message_id == message_id,
+    )
+    if source_folder:
+        star_query = star_query.filter(models.MailStar.source_folder == source_folder)
+    row = star_query.first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return {"ok": True, "starred": False}
 
 
 @router.post("/accounts/{account_id}/messages/{message_id}/restore")

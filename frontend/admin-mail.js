@@ -32,6 +32,37 @@ window.BARREL_registerMailPanel = function (api) {
     return state.accounts.filter(function (item) { return item.id === state.accountId; })[0] || null;
   }
 
+  function starSummary(message) {
+    var summary = {};
+    ['id', 'from', 'counterparty', 'to', 'subject', 'date', 'unread'].forEach(function (key) {
+      if (message[key] !== undefined) summary[key] = message[key];
+    });
+    return summary;
+  }
+
+  function toggleStar(message) {
+    var previous = !!message.starred;
+    var next = !previous;
+    var sourceFolder = message.source_folder || state.folder;
+    message.starred = next;
+    if (state.selected && state.selected.id === message.id) state.selected.starred = next;
+    renderMailbox();
+    var path = '/api/mail/accounts/' + encodeURIComponent(state.accountId) + '/messages/' + encodeURIComponent(message.id) + '/star';
+    var options = next
+      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source_folder: sourceFolder, message: starSummary(message) }) }
+      : { method: 'DELETE' };
+    if (!next) path += '?source_folder=' + encodeURIComponent(sourceFolder);
+    request(path, options).then(function () {
+      toast(next ? 'MESSAGE STARRED' : 'REMOVED FROM STARRED');
+      if (state.folder.toLowerCase() === 'starred' && !next) loadMailbox(false);
+    }).catch(function (error) {
+      message.starred = previous;
+      if (state.selected && state.selected.id === message.id) state.selected.starred = previous;
+      toast(error.message);
+      renderMailbox();
+    });
+  }
+
   function mailboxScrollKey(accountId, folder) {
     return (accountId || state.accountId || '') + ':' + (folder || state.folder || 'INBOX') + ':' + state.search;
   }
@@ -85,7 +116,7 @@ window.BARREL_registerMailPanel = function (api) {
     if (message._attachmentUrls[id]) return Promise.resolve(message._attachmentUrls[id]);
     if (message._attachmentRequests[id]) return message._attachmentRequests[id];
     var path = '/api/mail/accounts/' + encodeURIComponent(state.accountId) + '/messages/' + encodeURIComponent(message.id) +
-      '/attachments/' + encodeURIComponent(attachment.id) + '?folder=' + encodeURIComponent(state.folder);
+      '/attachments/' + encodeURIComponent(attachment.id) + '?folder=' + encodeURIComponent(message.source_folder || state.folder);
     message._attachmentRequests[id] = apiFetch(path).then(function (response) {
       if (response.ok) return response.blob();
       return response.text().then(function (text) {
@@ -356,7 +387,8 @@ window.BARREL_registerMailPanel = function (api) {
     var folderList = el('div', 'mail-col__scroll');
     (state.folders || []).forEach(function (folder) {
       var count = state.folder === folder.id ? (state.messageTotal || state.messages.length) : '';
-      var button = el('button', 'mail-folder' + (state.folder === folder.id ? ' active' : ''), '<span>' + esc(folder.label) + '</span>' + (count !== '' ? '<span class="badge">' + count + '</span>' : ''));
+      var folderLabel = folder.id.toLowerCase() === 'starred' ? '★ ' + folder.label : folder.label;
+      var button = el('button', 'mail-folder' + (state.folder === folder.id ? ' active' : ''), '<span>' + esc(folderLabel) + '</span>' + (count !== '' ? '<span class="badge">' + count + '</span>' : ''));
       button.addEventListener('click', function () { if (state.folder !== folder.id) { rememberListScroll(); state.folder = folder.id; loadMailbox(false); } });
       folderList.appendChild(button);
     });
@@ -378,9 +410,18 @@ window.BARREL_registerMailPanel = function (api) {
     else state.messages.forEach(function (message) {
       var counterparty = message.counterparty || message.from || {};
       var sender = counterparty.name || counterparty.email || 'Unknown sender';
-      var button = el('button', 'mail-msg' + (message.unread ? ' unread' : '') + (state.selected && state.selected.id === message.id ? ' active' : ''),
+      var button = el('div', 'mail-msg' + (message.unread ? ' unread' : '') + (state.selected && state.selected.id === message.id ? ' active' : ''),
         '<div class="mail-msg__top"><span class="mail-msg__from">' + esc(sender) + '</span><span class="mail-msg__time">' + esc(relTime(message.date)) + '</span></div><div class="mail-msg__subject">' + esc(message.subject) + '</div><div class="mail-msg__to">' + esc(counterparty.email || '') + '</div>');
+      button.setAttribute('role', 'button');
+      button.tabIndex = 0;
       button.addEventListener('click', function () { readMessage(message); });
+      button.addEventListener('keydown', function (event) { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); readMessage(message); } });
+      var star = el('button', 'mail-msg__star' + (message.starred ? ' is-starred' : ''), message.starred ? '★' : '☆');
+      star.type = 'button';
+      star.title = message.starred ? 'Remove from Starred' : 'Add to Starred';
+      star.setAttribute('aria-label', star.title);
+      star.addEventListener('click', function (event) { event.stopPropagation(); toggleStar(message); });
+      button.querySelector('.mail-msg__top').insertBefore(star, button.querySelector('.mail-msg__time'));
       list.appendChild(button);
     });
     if (!state.loading && !state.error && state.messages.length && state.messages.length < state.messageTotal) {
@@ -447,11 +488,13 @@ window.BARREL_registerMailPanel = function (api) {
     }
     var wrap = el('div', 'mail-reader');
     var actions = el('div', 'mail-reader__actions');
+    var star = el('button', 'btn btn--star' + (message.starred ? ' is-starred' : ''), message.starred ? '★ STARRED' : '☆ STAR');
+    star.addEventListener('click', function () { toggleStar(message); });
     var reply = el('button', 'btn btn--primary', 'REPLY');
     reply.addEventListener('click', function () { openCompose({ mode: 'reply', message: message }); });
     var forward = el('button', 'btn', 'FORWARD');
     forward.addEventListener('click', function () { openCompose({ mode: 'forward', message: message }); });
-    actions.appendChild(reply); actions.appendChild(forward);
+    actions.appendChild(star); actions.appendChild(reply); actions.appendChild(forward);
     if (state.folder.toLowerCase() === 'trash') {
       var restore = el('button', 'btn btn--ghost', 'RESTORE TO INBOX');
       restore.addEventListener('click', function () {
@@ -511,7 +554,10 @@ window.BARREL_registerMailPanel = function (api) {
     state.selected = summary;
     state.loadingMessage = true;
     renderMailbox();
-    request('/api/mail/accounts/' + encodeURIComponent(state.accountId) + '/messages/' + encodeURIComponent(summary.id) + '?folder=' + encodeURIComponent(state.folder))
+    var sourceFolderQuery = state.folder.toLowerCase() === 'starred' && summary.source_folder
+      ? '&source_folder=' + encodeURIComponent(summary.source_folder)
+      : '';
+    request('/api/mail/accounts/' + encodeURIComponent(state.accountId) + '/messages/' + encodeURIComponent(summary.id) + '?folder=' + encodeURIComponent(state.folder) + sourceFolderQuery)
       .then(function (message) { state.messageCache[cacheKey] = message; state.selected = message; state.loadingMessage = false; renderMailbox(); })
       .catch(function (error) { state.loadingMessage = false; toast(error.message); renderMailbox(); });
   }
