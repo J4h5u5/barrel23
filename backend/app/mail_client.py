@@ -324,13 +324,19 @@ def load_mailbox(
 
 
 def restore_message(config: MailboxConfig, folder: str, message_id: str) -> None:
-    """Copy a trashed message back to INBOX, then remove only that source UID."""
+    """Move a trashed message back to INBOX without leaving a Trash copy."""
     client = _connect_imap(config)
     try:
         status, _ = client.select(folder, readonly=False)
         if status != "OK":
             raise MailClientError("Could not open this mailbox folder")
         uid = str(message_id).encode()
+        status, _ = client.uid("MOVE", uid, "INBOX")
+        if status == "OK":
+            return
+
+        # Some IMAP servers do not implement MOVE. Keep the fallback scoped to
+        # this UID and expunge it after the copy succeeds.
         status, _ = client.uid("copy", uid, "INBOX")
         if status != "OK":
             raise MailClientError("Could not copy this message to Inbox")

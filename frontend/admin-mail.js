@@ -503,6 +503,8 @@ window.BARREL_registerMailPanel = function (api) {
         request('/api/mail/accounts/' + encodeURIComponent(state.accountId) + '/messages/' + encodeURIComponent(message.id) + '/restore?folder=' + encodeURIComponent(state.folder), { method: 'POST' })
           .then(function () {
             delete state.messageCache[state.accountId + ':' + state.folder + ':' + message.id];
+            state.selected = null;
+            state.folder = 'INBOX';
             toast('MESSAGE RESTORED TO INBOX');
             loadMailbox(false);
           })
