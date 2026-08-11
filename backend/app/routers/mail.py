@@ -124,13 +124,47 @@ def _star_account_key(account_id: str) -> str:
     return account_id
 
 
-def _with_starred_folder(folders: list[dict]) -> list[dict]:
-    if any(item.get("id", "").lower() == "starred" for item in folders):
-        return folders
+FOLDER_ORDER = {
+    "inbox": 0,
+    "starred": 1,
+    "sent": 2,
+    "drafts": 3,
+    "junk": 4,
+    "trash": 5,
+    "archive": 6,
+}
+
+
+def _folder_kind(folder: dict) -> str | None:
+    """Map provider-specific system folder names to the mailbox navigation order."""
+    value = f"{folder.get('id', '')} {folder.get('label', '')}".lower()
+    if folder.get("id", "").lower() == "inbox":
+        return "inbox"
+    if folder.get("id", "").lower() == "starred":
+        return "starred"
+    if any(name in value for name in ("sent", "outbox")):
+        return "sent"
+    if "draft" in value:
+        return "drafts"
+    if any(name in value for name in ("junk", "spam", "bulk")):
+        return "junk"
+    if any(name in value for name in ("trash", "deleted", "bin")):
+        return "trash"
+    if any(name in value for name in ("archive", "all mail")):
+        return "archive"
+    return None
+
+
+def _ordered_folders(folders: list[dict]) -> list[dict]:
     result = list(folders)
-    inbox_index = next((index for index, item in enumerate(result) if item.get("id", "").lower() == "inbox"), -1)
-    result.insert(inbox_index + 1 if inbox_index >= 0 else 0, {"id": "STARRED", "label": "Starred"})
-    return result
+    if not any(item.get("id", "").lower() == "starred" for item in result):
+        result.append({"id": "STARRED", "label": "Starred"})
+
+    def order_key(item: dict) -> tuple:
+        kind = _folder_kind(item)
+        return (FOLDER_ORDER.get(kind, len(FOLDER_ORDER)), (item.get("label") or item.get("id") or "").lower())
+
+    return sorted(result, key=order_key)
 
 
 def _starred_mailbox(db: Session, account_key: str, search: str, limit: int, offset: int) -> dict:
@@ -215,7 +249,7 @@ def test_account(account_id: str, db: Session = Depends(get_db), _=Depends(get_c
 def get_folders(account_id: str, db: Session = Depends(get_db), _=Depends(get_current_admin)):
     config, _ = _get_mailbox(db, account_id)
     try:
-        return {"folders": list_folders(config)}
+        return {"folders": _ordered_folders(list_folders(config))}
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
 
@@ -255,7 +289,7 @@ def get_mailbox(
         mailbox = load_mailbox(config, folder, limit, include_folders, offset, search)
         _apply_star_flags(db, _star_account_key(account_id), folder, mailbox.get("messages", []))
         if mailbox.get("folders"):
-            mailbox["folders"] = _with_starred_folder(mailbox["folders"])
+            mailbox["folders"] = _ordered_folders(mailbox["folders"])
         return mailbox
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
