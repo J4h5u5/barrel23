@@ -44,6 +44,19 @@ window.BARREL_registerMailPanel = function (api) {
     return '<svg class="mail-star-wave" viewBox="0 0 26 26" aria-hidden="true"><path class="mail-star-wave__brackets" d="M2 8V2h6M18 2h6v6M24 18v6h-6M8 24H2v-6"></path><path class="mail-star-wave__pulse" d="M3 13h3l2.5-8 3.5 16 3.5-11 2 3h5.5"></path><path class="mail-star-wave__core" d="M6 13h2l2.2-6 3 12 3-8.5 1.6 2.5H20"></path></svg>';
   }
 
+  function folderIcon(folder) {
+    var value = ((folder.id || '') + ' ' + (folder.label || '')).toLowerCase();
+    var path = '<path d="M3 7h7l2 2h9v10H3z"/><path d="M3 7V5h7l2 2"/>';
+    if ((folder.id || '').toLowerCase() === 'inbox') path = '<path d="M3 12h5l2 3h4l2-3h5"/><path d="M4 6h16v12H4z"/>';
+    else if ((folder.id || '').toLowerCase() === 'starred') path = '<path d="M12 4 20 12 12 20 4 12z"/>';
+    else if (value.indexOf('sent') !== -1 || value.indexOf('outbox') !== -1) path = '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>';
+    else if (value.indexOf('draft') !== -1) path = '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>';
+    else if (value.indexOf('archive') !== -1 || value.indexOf('all mail') !== -1) path = '<rect x="3" y="4" width="18" height="4"/><path d="M5 8v12h14V8M10 12h4"/>';
+    else if (value.indexOf('trash') !== -1 || value.indexOf('deleted') !== -1 || value.indexOf('bin') !== -1) path = '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>';
+    else if (value.indexOf('junk') !== -1 || value.indexOf('spam') !== -1 || value.indexOf('bulk') !== -1) path = '<path d="M12 3a9 9 0 1 0 9 9"/><path d="M5 5l14 14"/>';
+    return '<svg class="mail-folder__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + '</svg>';
+  }
+
   function toggleStar(message) {
     var previous = !!message.starred;
     var next = !previous;
@@ -429,8 +442,7 @@ window.BARREL_registerMailPanel = function (api) {
     var folderList = el('div', 'mail-col__scroll');
     (state.folders || []).forEach(function (folder) {
       var count = state.folder === folder.id ? (state.messageTotal || state.messages.length) : '';
-      var folderLabel = folder.id.toLowerCase() === 'starred' ? '★ ' + folder.label : folder.label;
-      var button = el('button', 'mail-folder' + (state.folder === folder.id ? ' active' : ''), '<span>' + esc(folderLabel) + '</span>' + (count !== '' ? '<span class="badge">' + count + '</span>' : ''));
+      var button = el('button', 'mail-folder' + (state.folder === folder.id ? ' active' : ''), folderIcon(folder) + '<span>' + esc(folder.label) + '</span>' + (count !== '' ? '<span class="badge">' + count + '</span>' : ''));
       button.addEventListener('click', function () { if (state.folder !== folder.id) { rememberListScroll(); state.folder = folder.id; loadMailbox(false); } });
       folderList.appendChild(button);
     });
