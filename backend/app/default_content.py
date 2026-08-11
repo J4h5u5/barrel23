@@ -20,6 +20,7 @@ DEFAULT_CONTENT = {
     },
     "announce": {
         "announced": True,
+        "visible": True,
         "kicker": "NEXT TRANSMISSION",
         "eventName": "COVEN",
         "date": "20 JUNE 2026",

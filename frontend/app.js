@@ -11,6 +11,28 @@
     return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
   }
 
+  function isResident(dj) {
+    return dj.group === 'resident' || (!dj.group && String(dj.role || '').trim().toUpperCase() === 'RESIDENT');
+  }
+
+  function renderDjs(targetId, artists) {
+    var target = $('#' + targetId);
+    if (!target) return;
+    target.innerHTML = artists.map(function (dj) {
+      var playedDate = formatPlayedDate(dj.playedDate);
+      var role = dj.role || (isResident(dj) ? 'RESIDENT' : 'GUEST ARTIST');
+      return '<article class="dj reveal">' +
+        '<img src="' + esc(dj.image) + '" alt="' + esc(dj.name) + '" loading="lazy">' +
+        '<div class="dj__scrim"></div>' +
+        '<div class="dj__info">' +
+          '<div class="dj__role">' + esc(role) + '</div>' +
+          (playedDate ? '<div class="dj__played">PLAYED ' + esc(playedDate) + '</div>' : '') +
+          '<div class="dj__name">' + esc(dj.name) + '</div>' +
+          '<div class="dj__socials">' + socialLinks(dj.socials || {}) + '</div>' +
+        '</div></article>';
+    }).join('');
+  }
+
 
   function init(C) {
     var announced = !(C.announce && C.announce.announced === false);
@@ -88,6 +110,8 @@
 
     /* ===== ANNOUNCE ===== */
     var a = C.announce;
+    var announceSection = $('#next');
+    if (announceSection) announceSection.hidden = a.visible === false;
     var anLive = $('#an-live'), anTba = $('#an-tba');
     $('#an-kicker').textContent = a.kicker;
     $('#an-title').innerHTML = '<em>' + esc(announced ? a.eventName : (a.tba && a.tba.headline ? a.tba.headline : 'TBA')) + '</em>';
@@ -176,18 +200,14 @@
       : '');
 
     /* ===== DJs ===== */
-    $('#djs').innerHTML = C.djs.map(function (dj) {
-      var playedDate = formatPlayedDate(dj.playedDate);
-      return '<article class="dj reveal">' +
-        '<img src="' + esc(dj.image) + '" alt="' + esc(dj.name) + '" loading="lazy">' +
-        '<div class="dj__scrim"></div>' +
-        '<div class="dj__info">' +
-          '<div class="dj__role">' + esc(dj.role || 'ARTIST') + '</div>' +
-          (playedDate ? '<div class="dj__played">PLAYED ' + esc(playedDate) + '</div>' : '') +
-          '<div class="dj__name">' + esc(dj.name) + '</div>' +
-          '<div class="dj__socials">' + socialLinks(dj.socials || {}) + '</div>' +
-        '</div></article>';
-    }).join("");
+    var artists = C.djs || [];
+    var residents = artists.filter(isResident);
+    var guests = artists.filter(function (dj) { return !isResident(dj); });
+    var residentsGroup = $('#djs-residents-group'), guestsGroup = $('#djs-guests-group');
+    if (residentsGroup) residentsGroup.hidden = !residents.length;
+    if (guestsGroup) guestsGroup.hidden = !guests.length;
+    renderDjs('djs-residents', residents);
+    renderDjs('djs-guests', guests);
 
     /* ===== ABOUT ===== */
     $('#ab-kicker').textContent = C.about.kicker;

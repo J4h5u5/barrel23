@@ -234,6 +234,21 @@
     return f;
   }
 
+  function selectField(labelText, value, options, hint) {
+    var f = el('div', 'field');
+    f.appendChild(el('label', null, labelText));
+    var input = el('select');
+    options.forEach(function (option) {
+      var item = el('option'); item.value = option[0]; item.textContent = option[1];
+      input.appendChild(item);
+    });
+    input.value = value;
+    f.appendChild(input);
+    if (hint) f.appendChild(el('div', 'hint', hint));
+    f._input = input;
+    return f;
+  }
+
   /* Image/file field with preset-aware upload */
   function mediaField(labelText, value, accept, onChange, preset) {
     preset = preset || 'gallery';
@@ -512,6 +527,7 @@
   panels.announce = function (root) {
     var a = C.announce;
     if (typeof a.announced === 'undefined') a.announced = true;
+    if (typeof a.visible === 'undefined') a.visible = true;
     a.tba = a.tba || { headline: 'TBA', status: 'TO BE ANNOUNCED', blurb: '', ctaLabel: 'GET THE DROP', ctaUrl: '#' };
 
     /* archive action card */
@@ -546,11 +562,12 @@
 
     /* status toggle card */
     var statusCard = el('div', 'card');
-    statusCard.innerHTML = '<div class="kick">BLOCK 01 + 02</div><div class="card__head"><div><h2>Next event status</h2><p>When the date isn\'t locked yet, switch to <b>Date TBA</b> — the countdown and event details are hidden and replaced with a "to be announced" state.</p></div></div>';
+    statusCard.innerHTML = '<div class="kick">BLOCK 01 + 02</div><div class="card__head"><div><h2>Next event status</h2><p>Use <b>Date TBA</b> to show the placeholder, or hide Block 02 completely while keeping the Hero signal visible.</p></div></div>';
     var segWrap = el('div'); segWrap.style.cssText = 'display:flex;gap:8px;margin:16px 0 0';
     var segOn = el('button', 'btn btn--sm', 'ANNOUNCED');
     var segOff = el('button', 'btn btn--sm', '◌ DATE TBA');
-    segWrap.appendChild(segOn); segWrap.appendChild(segOff);
+    var segHide = el('button', 'btn btn--sm', 'HIDE BLOCK 02');
+    segWrap.appendChild(segOn); segWrap.appendChild(segOff); segWrap.appendChild(segHide);
     statusCard.appendChild(segWrap);
     root.appendChild(statusCard);
 
@@ -636,14 +653,16 @@
 
     var liveCards = [card, lcard, icard];
     function applyState() {
-      segOn.classList.toggle('on', !!a.announced);
-      segOff.classList.toggle('on', !a.announced);
+      segOn.classList.toggle('on', a.visible && !!a.announced);
+      segOff.classList.toggle('on', a.visible && !a.announced);
+      segHide.classList.toggle('on', !a.visible);
       liveCards.forEach(function (c) { c.style.opacity = a.announced ? '' : '0.4'; c.style.pointerEvents = a.announced ? '' : 'none'; });
       tcard.style.opacity = a.announced ? '0.4' : '';
       tcard.style.pointerEvents = a.announced ? 'none' : '';
     }
-    segOn.addEventListener('click', function () { a.announced = true; setDirty(true); applyState(); });
-    segOff.addEventListener('click', function () { a.announced = false; setDirty(true); applyState(); });
+    segOn.addEventListener('click', function () { a.visible = true; a.announced = true; setDirty(true); applyState(); });
+    segOff.addEventListener('click', function () { a.visible = true; a.announced = false; setDirty(true); applyState(); });
+    segHide.addEventListener('click', function () { a.visible = false; setDirty(true); applyState(); });
     applyState();
   };
 
@@ -769,14 +788,16 @@
     box.style.cssText = 'background:#111;border:1px solid #333;padding:32px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;font-family:var(--mono)';
     box.innerHTML = '<div style="color:var(--red);font-size:11px;letter-spacing:3px;margin-bottom:20px">NEW DJ / ARTIST</div>';
 
-    var dj = { name: '', role: 'GUEST', playedDate: '', image: '', socials: {} };
+    var dj = { name: '', group: 'guest', role: 'GUEST ARTIST', playedDate: '', image: '', socials: {} };
 
     var g = el('div', 'grid cols-2');
     var fn = field('Name', ''); fn._input.addEventListener('input', function () { dj.name = fn._input.value; });
-    var fr = field('Role / Status', 'GUEST'); fr._input.addEventListener('input', function () { dj.role = fr._input.value; }); dj.role = 'GUEST';
+    var fg = selectField('Artist group', 'guest', [['resident', 'RESIDENT'], ['guest', 'GUEST ARTIST']], 'Custom statuses are shown in the guest artist group.');
+    fg._input.addEventListener('change', function () { dj.group = fg._input.value; });
+    var fr = field('Status shown on card', 'GUEST ARTIST'); fr._input.addEventListener('input', function () { dj.role = fr._input.value; });
     var fd = field('Played date (guest artist)', '', { type: 'date', hint: 'Optional. Shown publicly for visiting artists.' });
     fd._input.addEventListener('input', function () { dj.playedDate = fd._input.value; });
-    g.appendChild(fn); g.appendChild(fr); g.appendChild(fd);
+    g.appendChild(fn); g.appendChild(fg); g.appendChild(fr); g.appendChild(fd);
     box.appendChild(g);
 
     var imgF = mediaField('Photo', '', 'image/*', function (v) { dj.image = v; }, 'portrait');
@@ -1016,12 +1037,15 @@
       list.innerHTML = '';
       C.djs.forEach(function (dj, i) {
         dj.socials = dj.socials || {};
+        var group = dj.group || (String(dj.role || '').trim().toUpperCase() === 'RESIDENT' ? 'resident' : 'guest');
         var body = el('div');
         var g = el('div', 'grid cols-2');
         var f1 = field('Name', dj.name); bind(f1._input, dj, 'name');
-        var f2 = field('Role', dj.role); bind(f2._input, dj, 'role');
+        var f2 = selectField('Artist group', group, [['resident', 'RESIDENT'], ['guest', 'GUEST ARTIST']], 'Custom statuses are shown in the guest artist group.');
+        f2._input.addEventListener('change', function () { dj.group = f2._input.value; setDirty(true); });
         var f3 = field('Played date (guest artist)', dj.playedDate || '', { type: 'date', hint: 'Optional. Shown publicly for visiting artists.' }); bind(f3._input, dj, 'playedDate');
-        g.appendChild(f1); g.appendChild(f2); g.appendChild(f3); body.appendChild(g);
+        var f4 = field('Status shown on card', dj.role || (group === 'resident' ? 'RESIDENT' : 'GUEST ARTIST'), { hint: 'For example: HEADLINER, GUEST ARTIST, LIVE ACT.' }); bind(f4._input, dj, 'role');
+        g.appendChild(f1); g.appendChild(f2); g.appendChild(f3); g.appendChild(f4); body.appendChild(g);
         var img = mediaField('Portrait', dj.image, 'image/*', function (v) { dj.image = v; }); img.style.marginTop = '16px'; body.appendChild(img);
         var g2 = el('div', 'grid cols-2'); g2.style.marginTop = '16px';
         ['instagram', 'spotify', 'soundcloud', 'telegram', 'tiktok', 'youtube'].forEach(function (k) {
@@ -1034,8 +1058,8 @@
     }
     render();
     makeSortable(list, C.djs, render);
-    var add = el('button', 'btn btn--full', '+ ADD RESIDENT');
-    add.addEventListener('click', function () { C.djs.push({ name: 'NEW DJ', role: 'RESIDENT', playedDate: '', image: '', socials: { instagram: '#', spotify: '#', soundcloud: '#' } }); render(); setDirty(true); });
+    var add = el('button', 'btn btn--full', '+ ADD ARTIST');
+    add.addEventListener('click', function () { C.djs.push({ name: 'NEW ARTIST', group: 'guest', role: 'GUEST ARTIST', playedDate: '', image: '', socials: { instagram: '#', spotify: '#', soundcloud: '#' } }); render(); setDirty(true); });
     card.appendChild(list); card.appendChild(add);
     root.appendChild(card);
   };
@@ -1151,6 +1175,7 @@
       });
     }
     render();
+    makeSortable(list, C.sets, render);
     var add = el('button', 'btn btn--full', '+ ADD SET');
     add.addEventListener('click', function () { C.sets.push({ title: 'NEW SET', dj: '', event: '', duration: 3600, audioUrl: '' }); render(); setDirty(true); });
     card.appendChild(list); card.appendChild(add);
