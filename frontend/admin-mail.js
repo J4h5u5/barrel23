@@ -7,7 +7,7 @@ window.BARREL_registerMailPanel = function (api) {
   var savedListWidth = Number(localStorage.getItem('barrel23_mail_list_width'));
   var state = {
     accounts: [], accountId: null, folders: [], folder: 'INBOX', messages: [], selected: null,
-    loading: false, loadingOlder: false, error: '', messageCache: {}, messageTotal: 0, listScroll: {}, search: '', searchTimer: null, accountMenuClose: null, listWidth: savedListWidth >= 280 && savedListWidth <= 900 ? savedListWidth : 340
+    loading: false, loadingOlder: false, error: '', messageCache: {}, messageTotal: 0, listScroll: {}, search: '', searchDraft: '', searchTimer: null, searchCaret: 0, restoreSearchFocus: false, mailboxRequestId: 0, accountMenuClose: null, listWidth: savedListWidth >= 280 && savedListWidth <= 900 ? savedListWidth : 340
   };
 
   function esc(value) {
@@ -88,6 +88,21 @@ window.BARREL_registerMailPanel = function (api) {
     if (!rootEl) return;
     var list = rootEl.querySelector('.mail-col--list .mail-col__scroll');
     if (list) state.listScroll[list.dataset.mailboxKey || mailboxScrollKey()] = list.scrollTop;
+  }
+
+  function runSearch() {
+    window.clearTimeout(state.searchTimer);
+    var nextSearch = state.searchDraft.trim();
+    if (state.search === nextSearch) return;
+    rememberListScroll();
+    state.search = nextSearch;
+    state.restoreSearchFocus = true;
+    loadMailbox(false);
+  }
+
+  function scheduleSearch() {
+    window.clearTimeout(state.searchTimer);
+    state.searchTimer = window.setTimeout(runSearch, 2000);
   }
 
   function initials(value) {
@@ -276,6 +291,7 @@ window.BARREL_registerMailPanel = function (api) {
   }
 
   function loadMailbox(refreshFolders) {
+    var requestId = ++state.mailboxRequestId;
     state.loading = true;
     state.loadingOlder = false;
     state.error = '';
@@ -284,6 +300,7 @@ window.BARREL_registerMailPanel = function (api) {
     var id = encodeURIComponent(state.accountId);
     var includeFolders = refreshFolders === true || !state.folders.length;
     request('/api/mail/accounts/' + id + '/mailbox?folder=' + encodeURIComponent(state.folder) + '&include_folders=' + includeFolders + '&search=' + encodeURIComponent(state.search)).then(function (mailbox) {
+      if (requestId !== state.mailboxRequestId) return;
       if (mailbox.folders && mailbox.folders.length) state.folders = mailbox.folders;
       state.folder = mailbox.folder || state.folder;
       state.messages = mailbox.messages || [];
@@ -291,6 +308,7 @@ window.BARREL_registerMailPanel = function (api) {
       state.loading = false;
       renderMailbox();
     }).catch(function (error) {
+      if (requestId !== state.mailboxRequestId) return;
       state.loading = false;
       state.error = error.message;
       renderMailbox();
@@ -369,6 +387,8 @@ window.BARREL_registerMailPanel = function (api) {
         state.folders = [];
         state.messages = [];
         state.search = '';
+        state.searchDraft = '';
+        window.clearTimeout(state.searchTimer);
         loadMailbox(true);
       });
       menu.appendChild(option);
@@ -409,18 +429,19 @@ window.BARREL_registerMailPanel = function (api) {
     search.type = 'search';
     search.className = 'mail-search';
     search.placeholder = 'SEARCH THIS FOLDER';
-    search.value = state.search;
+    search.value = state.searchDraft;
     search.setAttribute('aria-label', 'Search this mailbox folder');
     search.addEventListener('input', function () {
-      window.clearTimeout(state.searchTimer);
-      state.searchTimer = window.setTimeout(function () {
-        var nextSearch = search.value.trim();
-        if (state.search !== nextSearch) {
-          rememberListScroll();
-          state.search = nextSearch;
-          loadMailbox(false);
-        }
-      }, 350);
+      state.searchDraft = search.value;
+      state.searchCaret = search.selectionStart == null ? search.value.length : search.selectionStart;
+      scheduleSearch();
+    });
+    search.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      state.searchDraft = search.value;
+      state.searchCaret = search.selectionStart == null ? search.value.length : search.selectionStart;
+      runSearch();
     });
     toolbar.appendChild(search);
     var spacer = el('span', 'spacer'); toolbar.appendChild(spacer);
@@ -500,6 +521,11 @@ window.BARREL_registerMailPanel = function (api) {
     rootEl.appendChild(app);
     window.requestAnimationFrame(function () {
       if (list.isConnected) list.scrollTop = state.listScroll[listKey] || 0;
+      if (!state.restoreSearchFocus || !search.isConnected) return;
+      search.focus({ preventScroll: true });
+      var caret = Math.min(state.searchCaret, search.value.length);
+      search.setSelectionRange(caret, caret);
+      if (!state.loading) state.restoreSearchFocus = false;
     });
   }
 
