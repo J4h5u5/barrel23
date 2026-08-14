@@ -110,14 +110,14 @@ window.BARREL_registerMailPanel = function (api) {
     return ((parts[0][0] || '') + (parts[1] ? parts[1][0] : '')).toUpperCase();
   }
 
-  function relTime(iso) {
-    if (!iso) return '';
-    var seconds = (Date.now() - new Date(iso).getTime()) / 1000;
-    if (seconds < 60) return 'now';
-    if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
-    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h';
-    if (seconds < 604800) return Math.floor(seconds / 86400) + 'd';
-    return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  function mailDay(iso) {
+    var date = new Date(iso);
+    if (!iso || isNaN(date.getTime())) return { key: 'unknown', label: 'UNDATED', shortLabel: '' };
+    function pad(value) { return String(value).padStart(2, '0'); }
+    var day = pad(date.getDate());
+    var month = pad(date.getMonth() + 1);
+    var year = date.getFullYear();
+    return { key: year + '-' + month + '-' + day, label: day + '.' + month + '.' + year, shortLabel: day + '.' + month };
   }
 
   function fullDate(iso) {
@@ -499,24 +499,41 @@ window.BARREL_registerMailPanel = function (api) {
     if (state.loading) list.appendChild(el('div', 'mail-loading', 'LOADING MESSAGES'));
     else if (state.error) list.appendChild(el('div', 'mail-empty', esc(state.error)));
     else if (!state.messages.length) list.appendChild(el('div', 'mail-empty', state.search ? 'NO MATCHES' : 'NO MESSAGES'));
-    else state.messages.forEach(function (message) {
-      var counterparty = message.counterparty || message.from || {};
-      var sender = counterparty.name || counterparty.email || 'Unknown sender';
-      var row = el('article', 'mail-msg' + (message.unread ? ' unread' : '') + (state.selected && state.selected.id === message.id ? ' active' : ''));
-      var star = el('button', 'mail-msg__star' + (message.starred ? ' is-starred' : ''), waveformStar());
-      star.type = 'button';
-      star.title = message.starred ? 'Remove from Starred' : 'Add to Starred';
-      star.setAttribute('aria-label', star.title);
-      star.setAttribute('aria-pressed', message.starred ? 'true' : 'false');
-      star.addEventListener('click', function (event) { event.stopPropagation(); toggleStar(message); });
-      var open = el('button', 'mail-msg__open',
-        '<span class="mail-msg__top"><span class="mail-msg__from">' + esc(sender) + '</span><span class="mail-msg__time">' + esc(relTime(message.date)) + '</span></span><span class="mail-msg__subject">' + esc(message.subject) + '</span><span class="mail-msg__to">' + esc(counterparty.email || '') + '</span>');
-      open.type = 'button';
-      open.addEventListener('click', function () { readMessage(message); });
-      row.appendChild(star);
-      row.appendChild(open);
-      list.appendChild(row);
-    });
+    else {
+      var dayGroups = [];
+      state.messages.forEach(function (message) {
+        var day = mailDay(message.date);
+        var group = dayGroups[dayGroups.length - 1];
+        if (!group || group.key !== day.key) {
+          group = { key: day.key, label: day.label, messages: [] };
+          dayGroups.push(group);
+        }
+        group.messages.push(message);
+      });
+      dayGroups.forEach(function (group) {
+        var daySection = el('section', 'mail-day');
+        daySection.appendChild(el('div', 'mail-day__label', '<span class="mail-day__signal"></span><span>' + esc(group.label) + '</span><i>' + group.messages.length + ' MSG</i>'));
+        group.messages.forEach(function (message) {
+          var counterparty = message.counterparty || message.from || {};
+          var sender = counterparty.name || counterparty.email || 'Unknown sender';
+          var row = el('article', 'mail-msg' + (message.unread ? ' unread' : '') + (state.selected && state.selected.id === message.id ? ' active' : ''));
+          var star = el('button', 'mail-msg__star' + (message.starred ? ' is-starred' : ''), waveformStar());
+          star.type = 'button';
+          star.title = message.starred ? 'Remove from Starred' : 'Add to Starred';
+          star.setAttribute('aria-label', star.title);
+          star.setAttribute('aria-pressed', message.starred ? 'true' : 'false');
+          star.addEventListener('click', function (event) { event.stopPropagation(); toggleStar(message); });
+          var open = el('button', 'mail-msg__open',
+            '<span class="mail-msg__top"><span class="mail-msg__from">' + esc(sender) + '</span><span class="mail-msg__time">' + esc(mailDay(message.date).shortLabel) + '</span></span><span class="mail-msg__subject">' + esc(message.subject) + '</span><span class="mail-msg__to">' + esc(counterparty.email || '') + '</span>');
+          open.type = 'button';
+          open.addEventListener('click', function () { readMessage(message); });
+          row.appendChild(star);
+          row.appendChild(open);
+          daySection.appendChild(row);
+        });
+        list.appendChild(daySection);
+      });
+    }
     if (!state.loading && !state.error && state.messages.length && state.messages.length < state.messageTotal) {
       var older = el('button', 'btn btn--ghost btn--sm mail-load-older', state.loadingOlder ? 'LOADING...' : 'LOAD 50 OLDER');
       older.disabled = state.loadingOlder;
