@@ -154,6 +154,17 @@ def _message_date(value: str | None) -> str | None:
         return None
 
 
+def _internal_message_date(data) -> str | None:
+    """Use the IMAP delivery timestamp when a message has no usable Date header."""
+    for item in data or []:
+        if not isinstance(item, tuple) or not isinstance(item[0], bytes):
+            continue
+        match = re.search(rb'\bINTERNALDATE "([^"]+)"', item[0])
+        if match:
+            return _message_date(match.group(1).decode(errors="replace"))
+    return None
+
+
 def _extract_message_bytes(data) -> bytes:
     for item in data:
         if isinstance(item, tuple) and isinstance(item[1], bytes):
@@ -195,7 +206,7 @@ def _message_summary(uid: bytes, data, own_email: str = "") -> dict:
         "counterparty": _message_counterparty(message, own_email),
         "to": _decode_header(message.get("To")),
         "subject": _decode_header(message.get("Subject")) or "(no subject)",
-        "date": _message_date(message.get("Date")),
+        "date": _message_date(message.get("Date")) or _internal_message_date(data),
         "unread": not _has_seen_flag(data),
     }
 
@@ -214,7 +225,8 @@ def _message_summaries(data, requested_uids: list[bytes], own_email: str = "") -
         elif current_uid is not None:
             grouped[current_uid].append(item)
     summaries = {uid: _message_summary(uid, parts, own_email) for uid, parts in grouped.items()}
-    return [summaries[uid] for uid in reversed(requested_uids) if uid in summaries]
+    ordered = [summaries[uid] for uid in reversed(requested_uids) if uid in summaries]
+    return sorted(ordered, key=lambda message: message.get("date") or "", reverse=True)
 
 
 def _mailbox_name(raw: bytes) -> str | None:
@@ -277,7 +289,7 @@ def _list_messages_from_client(
     if not uids:
         return [], total
     status, message_data = client.uid(
-        "fetch", b",".join(uids), "(UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)] FLAGS)"
+        "fetch", b",".join(uids), "(UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)] FLAGS INTERNALDATE)"
     )
     if status != "OK":
         raise MailClientError("Could not read message headers")
@@ -647,7 +659,7 @@ def get_message(config: MailboxConfig, folder: str, message_id: str) -> dict:
         status, _ = client.select(folder, readonly=True)
         if status != "OK":
             raise MailClientError("Could not open this mailbox folder")
-        status, data = client.uid("fetch", message_id, "(BODY.PEEK[] FLAGS)")
+        status, data = client.uid("fetch", message_id, "(BODY.PEEK[] FLAGS INTERNALDATE)")
         if status != "OK":
             raise MailClientError("Could not read this message")
         result = _message_summary(message_id.encode(), data, config.email)

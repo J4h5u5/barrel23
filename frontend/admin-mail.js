@@ -112,12 +112,18 @@ window.BARREL_registerMailPanel = function (api) {
 
   function mailDay(iso) {
     var date = new Date(iso);
-    if (!iso || isNaN(date.getTime())) return { key: 'unknown', label: 'UNDATED', shortLabel: '' };
+    if (!iso || isNaN(date.getTime())) return { key: 'unknown', label: 'RECENT', shortLabel: '' };
     function pad(value) { return String(value).padStart(2, '0'); }
     var day = pad(date.getDate());
     var month = pad(date.getMonth() + 1);
     var year = date.getFullYear();
-    return { key: year + '-' + month + '-' + day, label: day + '.' + month + '.' + year, shortLabel: day + '.' + month };
+    var key = year + '-' + month + '-' + day;
+    var today = new Date();
+    var todayKey = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
+    var yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    var yesterdayKey = yesterday.getFullYear() + '-' + pad(yesterday.getMonth() + 1) + '-' + pad(yesterday.getDate());
+    var label = key === todayKey ? 'TODAY' : key === yesterdayKey ? 'YESTERDAY' : day + '.' + month + '.' + year;
+    return { key: key, label: label, shortLabel: day + '.' + month };
   }
 
   function fullDate(iso) {
@@ -501,11 +507,13 @@ window.BARREL_registerMailPanel = function (api) {
     else if (!state.messages.length) list.appendChild(el('div', 'mail-empty', state.search ? 'NO MATCHES' : 'NO MESSAGES'));
     else {
       var dayGroups = [];
+      var dayGroupsByKey = {};
       state.messages.forEach(function (message) {
         var day = mailDay(message.date);
-        var group = dayGroups[dayGroups.length - 1];
-        if (!group || group.key !== day.key) {
+        var group = dayGroupsByKey[day.key];
+        if (!group) {
           group = { key: day.key, label: day.label, messages: [] };
+          dayGroupsByKey[day.key] = group;
           dayGroups.push(group);
         }
         group.messages.push(message);
