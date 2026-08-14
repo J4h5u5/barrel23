@@ -443,7 +443,24 @@ window.BARREL_registerMailPanel = function (api) {
       state.searchCaret = search.selectionStart == null ? search.value.length : search.selectionStart;
       runSearch();
     });
-    toolbar.appendChild(search);
+    var searchWrap = el('div', 'mail-search-wrap');
+    searchWrap.appendChild(search);
+    var clearSearch = el('button', 'mail-search__clear', '×');
+    clearSearch.type = 'button';
+    clearSearch.title = 'Clear search';
+    clearSearch.setAttribute('aria-label', 'Clear search');
+    clearSearch.hidden = !state.searchDraft;
+    clearSearch.addEventListener('click', function () {
+      search.value = '';
+      state.searchDraft = '';
+      state.searchCaret = 0;
+      clearSearch.hidden = true;
+      search.focus({ preventScroll: true });
+      runSearch();
+    });
+    search.addEventListener('input', function () { clearSearch.hidden = !search.value; });
+    searchWrap.appendChild(clearSearch);
+    toolbar.appendChild(searchWrap);
     var spacer = el('span', 'spacer'); toolbar.appendChild(spacer);
     var add = el('button', 'btn btn--primary btn--sm', '+ ADD MAILBOX');
     add.addEventListener('click', renderAccountForm);
