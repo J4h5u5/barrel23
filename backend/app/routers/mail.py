@@ -346,7 +346,7 @@ def star_message(
         raise _mail_failure(exc) from exc
     summary = {
         key: message.get(key)
-        for key in ("id", "from", "counterparty", "to", "subject", "date", "unread")
+        for key in ("id", "from", "counterparty", "to", "subject", "date", "unread", "has_attachments")
         if key in message
     }
     row = db.query(models.MailStar).filter(

@@ -34,7 +34,7 @@ window.BARREL_registerMailPanel = function (api) {
 
   function starSummary(message) {
     var summary = {};
-    ['id', 'from', 'counterparty', 'to', 'subject', 'date', 'unread'].forEach(function (key) {
+    ['id', 'from', 'counterparty', 'to', 'subject', 'date', 'unread', 'has_attachments'].forEach(function (key) {
       if (message[key] !== undefined) summary[key] = message[key];
     });
     return summary;
@@ -42,6 +42,10 @@ window.BARREL_registerMailPanel = function (api) {
 
   function waveformStar() {
     return '<svg class="mail-star-wave" viewBox="0 0 26 26" aria-hidden="true"><path class="mail-star-wave__brackets" d="M2 8V2h6M18 2h6v6M24 18v6h-6M8 24H2v-6"></path><path class="mail-star-wave__pulse" d="M3 13h3l2.5-8 3.5 16 3.5-11 2 3h5.5"></path><path class="mail-star-wave__core" d="M6 13h2l2.2-6 3 12 3-8.5 1.6 2.5H20"></path></svg>';
+  }
+
+  function attachmentMarker() {
+    return '<span class="mail-msg__attachment" title="Has attachments" aria-label="Has attachments"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5z"></path><path d="M14 3v6h6"></path><path d="m10 16.5 4.1-4.1a2.1 2.1 0 1 1 3 3l-4.4 4.4a3.2 3.2 0 0 1-4.5-4.5l4-4"></path></svg></span>';
   }
 
   function folderIcon(folder) {
@@ -532,7 +536,7 @@ window.BARREL_registerMailPanel = function (api) {
           star.setAttribute('aria-pressed', message.starred ? 'true' : 'false');
           star.addEventListener('click', function (event) { event.stopPropagation(); toggleStar(message); });
           var open = el('button', 'mail-msg__open',
-            '<span class="mail-msg__top"><span class="mail-msg__from">' + esc(sender) + '</span><span class="mail-msg__time">' + esc(mailDay(message.date).shortLabel) + '</span></span><span class="mail-msg__subject">' + esc(message.subject) + '</span><span class="mail-msg__to">' + esc(counterparty.email || '') + '</span>');
+            '<span class="mail-msg__top"><span class="mail-msg__from">' + esc(sender) + '</span><span class="mail-msg__time">' + esc(mailDay(message.date).shortLabel) + '</span></span><span class="mail-msg__subject">' + esc(message.subject) + '</span><span class="mail-msg__to"><span class="mail-msg__address">' + esc(counterparty.email || '') + '</span>' + (message.has_attachments ? attachmentMarker() : '') + '</span>');
           open.type = 'button';
           open.addEventListener('click', function () { readMessage(message); });
           row.appendChild(star);

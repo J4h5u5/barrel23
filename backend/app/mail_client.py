@@ -180,6 +180,15 @@ def _has_seen_flag(data) -> bool:
     return False
 
 
+def _has_attachments(data) -> bool:
+    """Detect attached files from IMAP BODYSTRUCTURE without downloading them."""
+    for item in data or []:
+        raw = item[0] if isinstance(item, tuple) else item
+        if isinstance(raw, bytes) and b'"ATTACHMENT"' in raw.upper():
+            return True
+    return False
+
+
 def _contact(name: str, email: str) -> dict:
     return {"name": _decode_header(name) or email or "Unknown sender", "email": email}
 
@@ -208,6 +217,7 @@ def _message_summary(uid: bytes, data, own_email: str = "") -> dict:
         "subject": _decode_header(message.get("Subject")) or "(no subject)",
         "date": _message_date(message.get("Date")) or _internal_message_date(data),
         "unread": not _has_seen_flag(data),
+        "has_attachments": _has_attachments(data),
     }
 
 
@@ -289,7 +299,7 @@ def _list_messages_from_client(
     if not uids:
         return [], total
     status, message_data = client.uid(
-        "fetch", b",".join(uids), "(UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)] FLAGS INTERNALDATE)"
+        "fetch", b",".join(uids), "(UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)] FLAGS INTERNALDATE BODYSTRUCTURE)"
     )
     if status != "OK":
         raise MailClientError("Could not read message headers")
@@ -667,6 +677,7 @@ def get_message(config: MailboxConfig, folder: str, message_id: str) -> dict:
         result["body"] = _extract_text(message)
         result["thread"] = _thread_blocks(result["body"], result["from"], result["date"])
         result["attachments"] = _attachment_metadata(_message_attachments(message))
+        result["has_attachments"] = bool(result["attachments"])
         return result
     finally:
         _logout(client)
