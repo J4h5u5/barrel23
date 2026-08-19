@@ -181,10 +181,21 @@ def _has_seen_flag(data) -> bool:
 
 
 def _has_attachments(data) -> bool:
-    """Detect attached files from IMAP BODYSTRUCTURE without downloading them."""
+    """Detect files from IMAP BODYSTRUCTURE without downloading message bodies."""
     for item in data or []:
         raw = item[0] if isinstance(item, tuple) else item
-        if isinstance(raw, bytes) and b'"ATTACHMENT"' in raw.upper():
+        if not isinstance(raw, bytes):
+            continue
+        structure = raw.upper()
+        if b'"ATTACHMENT"' in structure:
+            return True
+        # Mail clients often embed photos as named inline MIME parts. The
+        # message viewer exposes those files too, so flag them in the list.
+        if b'"FILENAME"' in structure or b'"NAME"' in structure:
+            return True
+        if b'"INLINE"' in structure and any(
+            media_type in structure for media_type in (b'"IMAGE"', b'"AUDIO"', b'"VIDEO"')
+        ):
             return True
     return False
 
