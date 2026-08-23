@@ -63,3 +63,17 @@ class MailStar(Base):
     source_folder = Column(String(255), nullable=False)
     message_data = Column(JSON, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class MailOngoing(Base):
+    """Application-level ongoing messages, independent from IMAP folders."""
+
+    __tablename__ = "mail_ongoing"
+    __table_args__ = (UniqueConstraint("account_key", "source_folder", "message_id", name="uq_mail_ongoing_account_folder_message"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_key = Column(String(255), nullable=False, index=True)
+    message_id = Column(String(255), nullable=False)
+    source_folder = Column(String(255), nullable=False)
+    message_data = Column(JSON, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

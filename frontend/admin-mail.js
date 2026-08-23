@@ -44,6 +44,10 @@ window.BARREL_registerMailPanel = function (api) {
     return '<svg class="mail-star-wave" viewBox="0 0 26 26" aria-hidden="true"><path class="mail-star-wave__brackets" d="M2 8V2h6M18 2h6v6M24 18v6h-6M8 24H2v-6"></path><path class="mail-star-wave__pulse" d="M3 13h3l2.5-8 3.5 16 3.5-11 2 3h5.5"></path><path class="mail-star-wave__core" d="M6 13h2l2.2-6 3 12 3-8.5 1.6 2.5H20"></path></svg>';
   }
 
+  function ongoingMark() {
+    return '<svg class="mail-ongoing-mark__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 5.5v3M12 15.5v3M5.5 12h3M15.5 12h3"></path><circle cx="12" cy="12" r="2.5"></circle></svg>';
+  }
+
   function attachmentMarker() {
     return '<span class="mail-msg__attachment" title="Has attachments" aria-label="Has attachments"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h9l5 5v13H5z"></path><path d="M14 3v6h6"></path><path d="m10 16.5 4.1-4.1a2.1 2.1 0 1 1 3 3l-4.4 4.4a3.2 3.2 0 0 1-4.5-4.5l4-4"></path></svg></span>';
   }
@@ -53,6 +57,7 @@ window.BARREL_registerMailPanel = function (api) {
     var path = '<path d="M3 7h7l2 2h9v10H3z"/><path d="M3 7V5h7l2 2"/>';
     if ((folder.id || '').toLowerCase() === 'inbox') path = '<path d="M3 12h5l2 3h4l2-3h5"/><path d="M4 6h16v12H4z"/>';
     else if ((folder.id || '').toLowerCase() === 'starred') path = '<path d="M12 4 20 12 12 20 4 12z"/>';
+    else if ((folder.id || '').toLowerCase() === 'ongoing') path = '<circle cx="12" cy="12" r="8.5"/><path d="M12 5.5v3M12 15.5v3M5.5 12h3M15.5 12h3"/><circle cx="12" cy="12" r="2.5"/>';
     else if (value.indexOf('sent') !== -1 || value.indexOf('outbox') !== -1) path = '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>';
     else if (value.indexOf('draft') !== -1) path = '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>';
     else if (value.indexOf('archive') !== -1 || value.indexOf('all mail') !== -1) path = '<rect x="3" y="4" width="18" height="4"/><path d="M5 8v12h14V8M10 12h4"/>';
@@ -61,28 +66,34 @@ window.BARREL_registerMailPanel = function (api) {
     return '<svg class="mail-folder__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + '</svg>';
   }
 
-  function toggleStar(message) {
-    var previous = !!message.starred;
+  function toggleLabel(message, label) {
+    var previous = !!message[label];
     var next = !previous;
     var sourceFolder = message.source_folder || state.folder;
-    message.starred = next;
-    if (state.selected && state.selected.id === message.id) state.selected.starred = next;
+    message[label] = next;
+    if (state.selected && state.selected.id === message.id) state.selected[label] = next;
     renderMailbox();
-    var path = '/api/mail/accounts/' + encodeURIComponent(state.accountId) + '/messages/' + encodeURIComponent(message.id) + '/star';
+    var endpoint = label === 'starred' ? 'star' : label;
+    var path = '/api/mail/accounts/' + encodeURIComponent(state.accountId) + '/messages/' + encodeURIComponent(message.id) + '/' + endpoint;
     var options = next
       ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source_folder: sourceFolder, message: starSummary(message) }) }
       : { method: 'DELETE' };
     if (!next) path += '?source_folder=' + encodeURIComponent(sourceFolder);
     request(path, options).then(function () {
-      toast(next ? 'MESSAGE STARRED' : 'REMOVED FROM STARRED');
-      if (state.folder.toLowerCase() === 'starred' && !next) loadMailbox(false);
+      var labelText = label.toUpperCase();
+      toast(next ? 'MESSAGE MARKED ' + labelText : 'REMOVED FROM ' + labelText);
+      if (state.folder.toLowerCase() === label && !next) loadMailbox(false);
     }).catch(function (error) {
-      message.starred = previous;
-      if (state.selected && state.selected.id === message.id) state.selected.starred = previous;
+      message[label] = previous;
+      if (state.selected && state.selected.id === message.id) state.selected[label] = previous;
       toast(error.message);
       renderMailbox();
     });
   }
+
+  function toggleStar(message) { toggleLabel(message, 'starred'); }
+
+  function toggleOngoing(message) { toggleLabel(message, 'ongoing'); }
 
   function mailboxScrollKey(accountId, folder) {
     return (accountId || state.accountId || '') + ':' + (folder || state.folder || 'INBOX') + ':' + state.search;
@@ -529,17 +540,26 @@ window.BARREL_registerMailPanel = function (api) {
           var counterparty = message.counterparty || message.from || {};
           var sender = counterparty.name || counterparty.email || 'Unknown sender';
           var row = el('article', 'mail-msg' + (message.unread ? ' unread' : '') + (state.selected && state.selected.id === message.id ? ' active' : ''));
+          var markers = el('div', 'mail-msg__markers');
           var star = el('button', 'mail-msg__star' + (message.starred ? ' is-starred' : ''), waveformStar());
           star.type = 'button';
           star.title = message.starred ? 'Remove from Starred' : 'Add to Starred';
           star.setAttribute('aria-label', star.title);
           star.setAttribute('aria-pressed', message.starred ? 'true' : 'false');
           star.addEventListener('click', function (event) { event.stopPropagation(); toggleStar(message); });
+          var ongoing = el('button', 'mail-msg__ongoing-toggle' + (message.ongoing ? ' is-ongoing' : ''), ongoingMark());
+          ongoing.type = 'button';
+          ongoing.title = message.ongoing ? 'Remove from Ongoing' : 'Mark as Ongoing';
+          ongoing.setAttribute('aria-label', ongoing.title);
+          ongoing.setAttribute('aria-pressed', message.ongoing ? 'true' : 'false');
+          ongoing.addEventListener('click', function (event) { event.stopPropagation(); toggleOngoing(message); });
           var open = el('button', 'mail-msg__open',
             '<span class="mail-msg__top"><span class="mail-msg__from">' + esc(sender) + '</span><span class="mail-msg__time">' + esc(mailDay(message.date).shortLabel) + '</span></span><span class="mail-msg__subject">' + esc(message.subject) + '</span><span class="mail-msg__to"><span class="mail-msg__address">' + esc(counterparty.email || '') + '</span>' + (message.has_attachments ? attachmentMarker() : '') + '</span>');
           open.type = 'button';
           open.addEventListener('click', function () { readMessage(message); });
-          row.appendChild(star);
+          markers.appendChild(star);
+          markers.appendChild(ongoing);
+          row.appendChild(markers);
           row.appendChild(open);
           daySection.appendChild(row);
         });
@@ -621,11 +641,17 @@ window.BARREL_registerMailPanel = function (api) {
     star.setAttribute('aria-label', star.title);
     star.setAttribute('aria-pressed', message.starred ? 'true' : 'false');
     star.addEventListener('click', function () { toggleStar(message); });
+    var ongoing = el('button', 'mail-reader__ongoing' + (message.ongoing ? ' is-ongoing' : ''), ongoingMark());
+    ongoing.type = 'button';
+    ongoing.title = message.ongoing ? 'Remove from Ongoing' : 'Mark as Ongoing';
+    ongoing.setAttribute('aria-label', ongoing.title);
+    ongoing.setAttribute('aria-pressed', message.ongoing ? 'true' : 'false');
+    ongoing.addEventListener('click', function () { toggleOngoing(message); });
     var reply = el('button', 'btn btn--primary', 'REPLY');
     reply.addEventListener('click', function () { openCompose({ mode: 'reply', message: message }); });
     var forward = el('button', 'btn', 'FORWARD');
     forward.addEventListener('click', function () { openCompose({ mode: 'forward', message: message }); });
-    actions.appendChild(star); actions.appendChild(reply); actions.appendChild(forward);
+    actions.appendChild(star); actions.appendChild(ongoing); actions.appendChild(reply); actions.appendChild(forward);
     if (state.folder.toLowerCase() === 'trash') {
       var restore = el('button', 'btn btn--ghost', 'RESTORE TO INBOX');
       restore.addEventListener('click', function () {
@@ -687,7 +713,7 @@ window.BARREL_registerMailPanel = function (api) {
     state.selected = summary;
     state.loadingMessage = true;
     renderMailbox();
-    var sourceFolderQuery = state.folder.toLowerCase() === 'starred' && summary.source_folder
+    var sourceFolderQuery = (state.folder.toLowerCase() === 'starred' || state.folder.toLowerCase() === 'ongoing') && summary.source_folder
       ? '&source_folder=' + encodeURIComponent(summary.source_folder)
       : '';
     request('/api/mail/accounts/' + encodeURIComponent(state.accountId) + '/messages/' + encodeURIComponent(summary.id) + '?folder=' + encodeURIComponent(state.folder) + sourceFolderQuery)

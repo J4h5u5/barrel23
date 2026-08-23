@@ -127,12 +127,22 @@ def _star_account_key(account_id: str) -> str:
 FOLDER_ORDER = {
     "inbox": 0,
     "starred": 1,
-    "sent": 2,
-    "drafts": 3,
-    "junk": 4,
-    "trash": 5,
-    "archive": 6,
+    "ongoing": 2,
+    "sent": 3,
+    "drafts": 4,
+    "junk": 5,
+    "trash": 6,
+    "archive": 7,
 }
+
+VIRTUAL_FOLDERS = {
+    "starred": {"id": "STARRED", "label": "Starred", "model": models.MailStar, "flag": "starred"},
+    "ongoing": {"id": "ONGOING", "label": "Ongoing", "model": models.MailOngoing, "flag": "ongoing"},
+}
+
+
+def _virtual_folder(folder: str) -> dict | None:
+    return VIRTUAL_FOLDERS.get(folder.lower())
 
 
 def _folder_kind(folder: dict) -> str | None:
@@ -142,6 +152,8 @@ def _folder_kind(folder: dict) -> str | None:
         return "inbox"
     if folder.get("id", "").lower() == "starred":
         return "starred"
+    if folder.get("id", "").lower() == "ongoing":
+        return "ongoing"
     if any(name in value for name in ("sent", "outbox")):
         return "sent"
     if "draft" in value:
@@ -157,8 +169,9 @@ def _folder_kind(folder: dict) -> str | None:
 
 def _ordered_folders(folders: list[dict]) -> list[dict]:
     result = list(folders)
-    if not any(item.get("id", "").lower() == "starred" for item in result):
-        result.append({"id": "STARRED", "label": "Starred"})
+    for key, virtual in VIRTUAL_FOLDERS.items():
+        if not any(item.get("id", "").lower() == key for item in result):
+            result.append({"id": virtual["id"], "label": virtual["label"]})
 
     def order_key(item: dict) -> tuple:
         kind = _folder_kind(item)
@@ -167,8 +180,11 @@ def _ordered_folders(folders: list[dict]) -> list[dict]:
     return sorted(result, key=order_key)
 
 
-def _starred_mailbox(db: Session, account_key: str, search: str, limit: int, offset: int) -> dict:
-    rows = db.query(models.MailStar).filter(models.MailStar.account_key == account_key).order_by(models.MailStar.created_at.desc()).all()
+def _virtual_mailbox(db: Session, account_key: str, folder: str, search: str, limit: int, offset: int) -> dict:
+    virtual = _virtual_folder(folder)
+    if not virtual:
+        raise ValueError("Unknown virtual mailbox")
+    rows = db.query(virtual["model"]).filter(virtual["model"].account_key == account_key).order_by(virtual["model"].created_at.desc()).all()
     query = search.strip().lower()
     if query:
         rows = [
@@ -183,24 +199,28 @@ def _starred_mailbox(db: Session, account_key: str, search: str, limit: int, off
     for row in selected:
         message = dict(row.message_data or {})
         message["id"] = row.message_id
-        message["starred"] = True
+        message[virtual["flag"]] = True
         message["source_folder"] = row.source_folder
         messages.append(message)
-    return {"folders": [], "folder": "STARRED", "messages": messages, "message_total": len(rows)}
+    return {"folders": [], "folder": virtual["id"], "messages": messages, "message_total": len(rows)}
 
 
-def _apply_star_flags(db: Session, account_key: str, folder: str, messages: list[dict]) -> None:
+def _apply_virtual_flags(db: Session, account_key: str, folder: str, messages: list[dict]) -> None:
     if not messages:
         return
-    starred_ids = {
-        row.message_id
-        for row in db.query(models.MailStar.message_id).filter(
-            models.MailStar.account_key == account_key,
-            models.MailStar.source_folder == folder,
-        ).all()
-    }
+    label_ids = {}
+    for virtual in VIRTUAL_FOLDERS.values():
+        model = virtual["model"]
+        label_ids[virtual["flag"]] = {
+            row.message_id
+            for row in db.query(model.message_id).filter(
+                model.account_key == account_key,
+                model.source_folder == folder,
+            ).all()
+        }
     for message in messages:
-        message["starred"] = str(message.get("id", "")) in starred_ids
+        for flag, message_ids in label_ids.items():
+            message[flag] = str(message.get("id", "")) in message_ids
 
 
 @router.get("/accounts")
@@ -265,8 +285,13 @@ def get_messages(
     _=Depends(get_current_admin),
 ):
     config, _ = _get_mailbox(db, account_id)
+    if _virtual_folder(folder):
+        mailbox = _virtual_mailbox(db, _star_account_key(account_id), folder, search, limit, offset)
+        return {"messages": mailbox["messages"]}
     try:
-        return {"messages": list_messages(config, folder, limit, offset, search)}
+        messages = list_messages(config, folder, limit, offset, search)
+        _apply_virtual_flags(db, _star_account_key(account_id), folder, messages)
+        return {"messages": messages}
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
 
@@ -283,11 +308,11 @@ def get_mailbox(
     _=Depends(get_current_admin),
 ):
     config, _ = _get_mailbox(db, account_id)
-    if folder.lower() == "starred":
-        return _starred_mailbox(db, _star_account_key(account_id), search, limit, offset)
+    if _virtual_folder(folder):
+        return _virtual_mailbox(db, _star_account_key(account_id), folder, search, limit, offset)
     try:
         mailbox = load_mailbox(config, folder, limit, include_folders, offset, search)
-        _apply_star_flags(db, _star_account_key(account_id), folder, mailbox.get("messages", []))
+        _apply_virtual_flags(db, _star_account_key(account_id), folder, mailbox.get("messages", []))
         if mailbox.get("folders"):
             mailbox["folders"] = _ordered_folders(mailbox["folders"])
         return mailbox
@@ -306,38 +331,42 @@ def read_message(
 ):
     config, _ = _get_mailbox(db, account_id)
     message_folder = folder
-    star = None
-    if folder.lower() == "starred":
-        star_query = db.query(models.MailStar).filter(
-            models.MailStar.account_key == _star_account_key(account_id),
-            models.MailStar.message_id == message_id,
+    virtual = _virtual_folder(folder)
+    label = None
+    if virtual:
+        model = virtual["model"]
+        label_query = db.query(model).filter(
+            model.account_key == _star_account_key(account_id),
+            model.message_id == message_id,
         )
         if source_folder_query:
-            star_query = star_query.filter(models.MailStar.source_folder == source_folder_query)
-        star = star_query.first()
-        if not star:
-            raise HTTPException(404, "Starred message not found")
-        message_folder = star.source_folder
+            label_query = label_query.filter(model.source_folder == source_folder_query)
+        label = label_query.first()
+        if not label:
+            raise HTTPException(404, f"{virtual['label']} message not found")
+        message_folder = label.source_folder
     try:
         message = get_message(config, message_folder, message_id)
-        if star:
-            message["starred"] = True
+        _apply_virtual_flags(db, _star_account_key(account_id), message_folder, [message])
+        if label:
             message["source_folder"] = message_folder
         return message
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
 
 
-@router.post("/accounts/{account_id}/messages/{message_id}/star")
-def star_message(
+def _add_virtual_label(
     account_id: str,
     message_id: str,
     payload: MailStarCreate,
-    db: Session = Depends(get_db),
-    _=Depends(get_current_admin),
-):
-    if payload.source_folder.lower() == "starred":
-        raise HTTPException(400, "A starred message needs an IMAP source folder")
+    db: Session,
+    label_name: str = "",
+) -> dict:
+    virtual = _virtual_folder(label_name)
+    if not virtual:
+        raise ValueError("Unknown mail label")
+    if _virtual_folder(payload.source_folder):
+        raise HTTPException(400, f"An {label_name} message needs an IMAP source folder")
     config, _ = _get_mailbox(db, account_id)
     # Verify the UID and keep only the summary data needed for the virtual folder.
     try:
@@ -349,23 +378,53 @@ def star_message(
         for key in ("id", "from", "counterparty", "to", "subject", "date", "unread", "has_attachments")
         if key in message
     }
-    row = db.query(models.MailStar).filter(
-        models.MailStar.account_key == _star_account_key(account_id),
-        models.MailStar.source_folder == payload.source_folder,
-        models.MailStar.message_id == message_id,
+    model = virtual["model"]
+    row = db.query(model).filter(
+        model.account_key == _star_account_key(account_id),
+        model.source_folder == payload.source_folder,
+        model.message_id == message_id,
     ).first()
     if row:
         row.source_folder = payload.source_folder
         row.message_data = summary
     else:
-        db.add(models.MailStar(
+        db.add(model(
             account_key=_star_account_key(account_id),
             message_id=message_id,
             source_folder=payload.source_folder,
             message_data=summary,
         ))
     db.commit()
-    return {"ok": True, "starred": True}
+    return {"ok": True, virtual["flag"]: True}
+
+
+def _remove_virtual_label(account_id: str, message_id: str, source_folder: str, db: Session, label_name: str) -> dict:
+    virtual = _virtual_folder(label_name)
+    if not virtual:
+        raise ValueError("Unknown mail label")
+    model = virtual["model"]
+    label_query = db.query(model).filter(
+        model.account_key == _star_account_key(account_id),
+        model.message_id == message_id,
+    )
+    if source_folder:
+        label_query = label_query.filter(model.source_folder == source_folder)
+    row = label_query.first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return {"ok": True, virtual["flag"]: False}
+
+
+@router.post("/accounts/{account_id}/messages/{message_id}/star")
+def star_message(
+    account_id: str,
+    message_id: str,
+    payload: MailStarCreate,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    return _add_virtual_label(account_id, message_id, payload, db, "starred")
 
 
 @router.delete("/accounts/{account_id}/messages/{message_id}/star")
@@ -376,17 +435,29 @@ def unstar_message(
     db: Session = Depends(get_db),
     _=Depends(get_current_admin),
 ):
-    star_query = db.query(models.MailStar).filter(
-        models.MailStar.account_key == _star_account_key(account_id),
-        models.MailStar.message_id == message_id,
-    )
-    if source_folder:
-        star_query = star_query.filter(models.MailStar.source_folder == source_folder)
-    row = star_query.first()
-    if row:
-        db.delete(row)
-        db.commit()
-    return {"ok": True, "starred": False}
+    return _remove_virtual_label(account_id, message_id, source_folder, db, "starred")
+
+
+@router.post("/accounts/{account_id}/messages/{message_id}/ongoing")
+def mark_message_ongoing(
+    account_id: str,
+    message_id: str,
+    payload: MailStarCreate,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    return _add_virtual_label(account_id, message_id, payload, db, "ongoing")
+
+
+@router.delete("/accounts/{account_id}/messages/{message_id}/ongoing")
+def unmark_message_ongoing(
+    account_id: str,
+    message_id: str,
+    source_folder: str = Query("", max_length=255),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_admin),
+):
+    return _remove_virtual_label(account_id, message_id, source_folder, db, "ongoing")
 
 
 @router.post("/accounts/{account_id}/messages/{message_id}/restore")
