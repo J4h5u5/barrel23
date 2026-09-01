@@ -247,14 +247,19 @@ window.BARREL_registerMailPanel = function (api) {
   }
 
   function downloadAttachment(message, attachment) {
-    attachmentUrl(message, attachment).then(function (url) {
-      var link = document.createElement('a');
-      link.href = url;
-      link.download = attachment.filename || 'attachment';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    }).catch(function (error) { toast(error.message); });
+    if (!attachment.download_url) {
+      toast('DOWNLOAD LINK EXPIRED. REOPEN THE MESSAGE.');
+      return;
+    }
+    // Safari cannot reliably download asynchronously-created blob: URLs. This is
+    // a short-lived, attachment-specific URL returned with the message details.
+    var link = document.createElement('a');
+    link.href = attachment.download_url;
+    link.download = attachment.filename || 'attachment';
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   }
 
   function renderAttachments(message) {

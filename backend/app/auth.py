@@ -30,6 +30,49 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 
 
+def create_attachment_download_token(
+    username: str,
+    account_id: str,
+    message_id: str,
+    attachment_id: int,
+    folder: str,
+) -> str:
+    """Create a short-lived token scoped to one mail attachment."""
+    return create_access_token(
+        {
+            "sub": username,
+            "scope": "mail_attachment_download",
+            "account_id": account_id,
+            "message_id": message_id,
+            "attachment_id": attachment_id,
+            "folder": folder,
+        },
+        expires_delta=timedelta(minutes=10),
+    )
+
+
+def verify_attachment_download_token(token: str, db: Session) -> dict:
+    """Validate a download token without requiring an Authorization header."""
+    exc = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired download link")
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        if (
+            payload.get("scope") != "mail_attachment_download"
+            or not payload.get("sub")
+            or not payload.get("account_id")
+            or not payload.get("message_id")
+            or not isinstance(payload.get("attachment_id"), int)
+            or not payload.get("folder")
+        ):
+            raise exc
+    except JWTError:
+        raise exc
+    admin = db.query(models.Admin).filter(models.Admin.username == payload["sub"]).first()
+    if not admin:
+        raise exc
+    return payload
+
+
 def authenticate_admin(db: Session, username: str, password: str):
     admin = db.query(models.Admin).filter(models.Admin.username == username).first()
     if not admin or not verify_password(password, admin.password_hash):

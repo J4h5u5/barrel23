@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from .. import models
-from ..auth import get_current_admin
+from ..auth import create_attachment_download_token, get_current_admin, verify_attachment_download_token
 from ..config import settings
 from ..database import get_db
 from ..mail_client import (
@@ -118,6 +118,34 @@ def _get_mailbox(db: Session, account_id: str) -> tuple[MailboxConfig, bool]:
 
 def _mail_failure(exc: MailClientError) -> HTTPException:
     return HTTPException(502, str(exc))
+
+
+def _attachment_response(attachment: MailAttachment, download: bool = False) -> Response:
+    disposition = "attachment" if download else "inline"
+    return Response(
+        content=attachment.content,
+        media_type=attachment.content_type,
+        headers={
+            "Content-Disposition": disposition + "; filename*=UTF-8''" + quote(attachment.filename, safe=""),
+            "Cache-Control": "private, max-age=300",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+def _add_attachment_download_urls(message: dict, account_id: str, folder: str, username: str) -> None:
+    for attachment in message.get("attachments", []):
+        attachment_id = attachment.get("id")
+        if not isinstance(attachment_id, int):
+            continue
+        token = create_attachment_download_token(
+            username,
+            account_id,
+            str(message.get("id", "")),
+            attachment_id,
+            folder,
+        )
+        attachment["download_url"] = "/api/mail/attachment-download?token=" + quote(token, safe="")
 
 
 def _star_account_key(account_id: str) -> str:
@@ -327,7 +355,7 @@ def read_message(
     folder: str = Query("INBOX", min_length=1, max_length=255),
     source_folder_query: str = Query("", alias="source_folder", max_length=255),
     db: Session = Depends(get_db),
-    _=Depends(get_current_admin),
+    admin=Depends(get_current_admin),
 ):
     config, _ = _get_mailbox(db, account_id)
     message_folder = folder
@@ -350,6 +378,7 @@ def read_message(
         _apply_virtual_flags(db, _star_account_key(account_id), message_folder, [message])
         if label:
             message["source_folder"] = message_folder
+        _add_attachment_download_urls(message, account_id, message_folder, admin.username)
         return message
     except MailClientError as exc:
         raise _mail_failure(exc) from exc
@@ -494,15 +523,26 @@ def read_attachment(
         if str(exc) == "Attachment was not found":
             raise HTTPException(404, str(exc)) from exc
         raise _mail_failure(exc) from exc
-    return Response(
-        content=attachment.content,
-        media_type=attachment.content_type,
-        headers={
-            "Content-Disposition": "inline; filename*=UTF-8''" + quote(attachment.filename, safe=""),
-            "Cache-Control": "private, max-age=300",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
+    return _attachment_response(attachment)
+
+
+@router.get("/attachment-download")
+def download_attachment(token: str = Query(..., min_length=1), db: Session = Depends(get_db)):
+    """Browser-native attachment download for Safari and other browsers without blob URLs."""
+    payload = verify_attachment_download_token(token, db)
+    config, _ = _get_mailbox(db, payload["account_id"])
+    try:
+        attachment = get_message_attachment(
+            config,
+            payload["folder"],
+            payload["message_id"],
+            payload["attachment_id"],
+        )
+    except MailClientError as exc:
+        if str(exc) == "Attachment was not found":
+            raise HTTPException(404, str(exc)) from exc
+        raise _mail_failure(exc) from exc
+    return _attachment_response(attachment, download=True)
 
 
 @router.post("/accounts/{account_id}/send")
